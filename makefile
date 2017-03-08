@@ -46,19 +46,45 @@ projgen: ## Generate project files for all configurations.
 	$(GENIE) --with-tools --with-combined-examples --with-shared-lib --xcode=ios           xcode9
 	$(GENIE)              --with-combined-examples --with-shared-lib --gcc=android-arm64   gmake
 	$(GENIE)              --with-combined-examples                   --gcc=ios-arm64       gmake
+	$(GENIE)              --with-combined-examples                   --gcc=ios-simulator   gmake
+	$(GENIE)              --with-combined-examples                   --gcc=ios-simulator64 gmake
 	$(GENIE)              --with-combined-examples                   --gcc=rpi             gmake
 
 idl: ## Generate code from IDL.
 	@echo Generating code from IDL.
 	cd scripts && ../$(GENIE) idl
 
+.build/projects/gmake-android-arm:
+	$(GENIE) --gcc=android-arm gmake
+android-arm-debug: .build/projects/gmake-android-arm ## Build - Android ARM Debug
+	$(MAKE) -R -C .build/projects/gmake-android-arm config=debug
+android-arm-release: .build/projects/gmake-android-arm ## Build - Android ARM Release
+	$(MAKE) -R -C .build/projects/gmake-android-arm config=release
+android-arm: android-arm-debug android-arm-release ## Build - Android ARM Debug and Release
+
 .build/projects/gmake-android-arm64:
-	$(GENIE) --gcc=android-arm64 --with-combined-examples --with-shared-lib gmake
+	$(GENIE) --gcc=android-arm64 gmake
 android-arm64-debug: .build/projects/gmake-android-arm64 ## Build - Android ARM64 Debug
 	$(MAKE) -R -C .build/projects/gmake-android-arm64 config=debug
 android-arm64-release: .build/projects/gmake-android-arm64 ## Build - Android ARM64 Release
 	$(MAKE) -R -C .build/projects/gmake-android-arm64 config=release
 android-arm64: android-arm64-debug android-arm64-release ## Build - Android ARM64 Debug and Release
+
+.build/projects/gmake-android-x86:
+	$(GENIE) --gcc=android-x86 gmake
+android-x86-debug: .build/projects/gmake-android-x86 ## Build - Android x86 Debug and Release
+	$(MAKE) -R -C .build/projects/gmake-android-x86 config=debug
+android-x86-release: .build/projects/gmake-android-x86 ## Build - Android x86 Debug and Release
+	$(MAKE) -R -C .build/projects/gmake-android-x86 config=release
+android-x86: android-x86-debug android-x86-release ## Build - Android x86 Debug and Release
+
+.build/projects/gmake-android-x86_64:
+	$(GENIE) --gcc=android-x86_64 gmake
+android-x86_64-debug: .build/projects/gmake-android-x86_64 ## Build - Android x86_64 Debug and Release
+	$(MAKE) -R -C .build/projects/gmake-android-x86_64 config=debug
+android-x86_64-release: .build/projects/gmake-android-x86_64 ## Build - Android x86_64 Debug and Release
+	$(MAKE) -R -C .build/projects/gmake-android-x86_64 config=release
+android-x86_64: android-x86_64-debug android-x86_64-release ## Build - Android x86_64 Debug and Release
 
 .build/projects/gmake-wasm:
 	$(GENIE) --gcc=wasm --with-combined-examples gmake
@@ -120,8 +146,21 @@ vs2022-release64: .build/projects/vs2022 ## Build - vs2022 x64 Release
 	devenv .build/projects/vs2022/bgfx.sln /Build "Release|x64"
 vs2022: vs2022-debug32 vs2022-release32 vs2022-debug64 vs2022-release64 ## Build - vs2022 x86/x64 Debug and Release
 
+.build/projects/gmake-osx-x64:
+	$(GENIE) --gcc=osx-x64 gmake
 .build/projects/gmake-osx-arm64:
-	$(GENIE) --with-tools --with-combined-examples --with-shared-lib --gcc=osx-arm64 gmake
+	$(GENIE) --gcc=osx-arm64 gmake
+
+osx-debug: osx-x64-debug osx-arm64-debug ## Build - macOS Universal Debug
+osx-release: osx-x64-release osx-arm64-release ## Build - macOS Universal Release
+osx: osx-debug osx-release ## Build - macOS Universal Debug and Release
+
+osx-x64-debug: .build/projects/gmake-osx-x64 ## Build - macOS x64 Debug
+	$(MAKE) -C .build/projects/gmake-osx-x64 config=debug
+osx-x64-release: .build/projects/gmake-osx-x64 ## Build - macOS x64 Release
+	$(MAKE) -C .build/projects/gmake-osx-x64 config=release
+osx-x64: osx-x64-debug osx-x64-release ## Build - macOS x64 Debug and Release
+
 osx-arm64-debug: .build/projects/gmake-osx-arm64 ## Build - macOS ARM Debug
 	$(MAKE) -C .build/projects/gmake-osx-arm64 config=debug
 osx-arm64-release: .build/projects/gmake-osx-arm64 ## Build - macOS ARM Release
@@ -135,6 +174,22 @@ ios-arm64-debug: .build/projects/gmake-ios-arm64 ## Build - iOS ARM64 Debug
 ios-arm64-release: .build/projects/gmake-ios-arm64 ## Build - iOS ARM64 Release
 	$(MAKE) -R -C .build/projects/gmake-ios-arm64 config=release
 ios-arm64: ios-arm64-debug ios-arm64-release ## Build - iOS ARM64 Debug and Release
+
+.build/projects/gmake-ios-simulator:
+	$(GENIE) --gcc=ios-simulator gmake
+ios-simulator-debug: .build/projects/gmake-ios-simulator ## Build - iOS Simulator Debug
+	$(MAKE) -R -C .build/projects/gmake-ios-simulator config=debug
+ios-simulator-release: .build/projects/gmake-ios-simulator ## Build - iOS Simulator Release
+	$(MAKE) -R -C .build/projects/gmake-ios-simulator config=release
+ios-simulator: ios-simulator-debug ios-simulator-release ## Build - iOS Simulator Debug and Release
+
+.build/projects/gmake-ios-simulator64:
+	$(GENIE) --gcc=ios-simulator64 gmake
+ios-simulator64-debug: .build/projects/gmake-ios-simulator64 ## Build - iOS Simulator Debug
+	$(MAKE) -R -C .build/projects/gmake-ios-simulator64 config=debug
+ios-simulator64-release: .build/projects/gmake-ios-simulator64 ## Build - iOS Simulator Release
+	$(MAKE) -R -C .build/projects/gmake-ios-simulator64 config=release
+ios-simulator64: ios-simulator64-debug ios-simulator64-release ## Build - iOS Simulator Debug and Release
 
 .build/projects/gmake-rpi:
 	$(GENIE) --gcc=rpi gmake

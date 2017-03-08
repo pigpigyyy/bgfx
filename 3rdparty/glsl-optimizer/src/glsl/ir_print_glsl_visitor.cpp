@@ -1340,10 +1340,10 @@ void print_float (string_buffer& buffer, float f)
 
 	// snprintf formats infinity as inf.0 or -inf.0, which isn't useful here.
 	// GLSL has no infinity constant so print an equivalent expression instead.
-	if (f == std::numeric_limits<float>::infinity())
+	if (isinf(f) && f > 0.0f)
 		strcpy(tmp, "(1.0/0.0)");
 
-	if (f == -std::numeric_limits<float>::infinity())
+	if (isinf(f) && f < 0.0f)
 		strcpy(tmp, "(-1.0/0.0)");
 	
 	// Do similar thing for NaN
