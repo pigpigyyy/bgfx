@@ -3878,10 +3878,9 @@ namespace bgfx { namespace d3d9
 							DX_CHECK(device->SetRenderState(D3DRS_STENCILMASK, rmask) );
 						}
 
- 						uint32_t bchanged = unpackStencil(1, changedStencil);
- 						if (BGFX_STENCIL_FUNC_RMASK_MASK & bchanged)
+ 						if (BGFX_STENCIL_FUNC_RMASK_MASK & fchanged)
  						{
- 							uint32_t wmask = (bstencil&BGFX_STENCIL_FUNC_RMASK_MASK)>>BGFX_STENCIL_FUNC_RMASK_SHIFT;
+ 							uint32_t wmask = (fstencil&BGFX_STENCIL_FUNC_RMASK_MASK)>>BGFX_STENCIL_FUNC_RMASK_SHIFT;
  							DX_CHECK(device->SetRenderState(D3DRS_STENCILWRITEMASK, wmask) );
  						}
 
