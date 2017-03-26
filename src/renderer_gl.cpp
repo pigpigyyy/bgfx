@@ -851,10 +851,16 @@ namespace bgfx { namespace gl
 	static const char* s_ARB_shader_texture_lod[] =
 	{
 		"texture2DLod",
+		"texture2DArrayLod", // BK - interacts with ARB_texture_array.
 		"texture2DProjLod",
+		"texture2DGrad",
+		"texture2DProjGrad",
 		"texture3DLod",
 		"texture3DProjLod",
+		"texture3DGrad",
+		"texture3DProjGrad",
 		"textureCubeLod",
+		"textureCubeGrad",
 		"shadow2DLod",
 		"shadow2DProjLod",
 		NULL
@@ -869,10 +875,10 @@ namespace bgfx { namespace gl
 		"texture2DLod",
 		"texture2DProjLod",
 		"textureCubeLod",
+		"texture2DGrad",
+		"texture2DProjGrad",
+		"textureCubeGrad",
 		NULL
-		// "texture2DGrad",
-		// "texture2DProjGrad",
-		// "textureCubeGrad",
 	};
 
 	static const char* s_EXT_shadow_samplers[] =
@@ -4684,6 +4690,7 @@ namespace bgfx { namespace gl
 			GL_CHECK(glGenTextures(1, &m_id) );
 			BX_CHECK(0 != m_id, "Failed to generate texture id.");
 			GL_CHECK(glBindTexture(_target, m_id) );
+			GL_CHECK(glPixelStorei(GL_UNPACK_ALIGNMENT, 1) );
 
 			const TextureFormatInfo& tfi = s_textureFormat[m_textureFormat];
 			m_fmt  = tfi.m_fmt;
@@ -5498,15 +5505,20 @@ namespace bgfx { namespace gl
 
 					if (usesTextureLod)
 					{
-						BX_WARN(s_extension[Extension::EXT_shader_texture_lod].m_supported, "EXT_shader_texture_lod is used but not supported by GLES2 driver.");
-						if (s_extension[Extension::EXT_shader_texture_lod].m_supported
-						/*&&  GL_VERTEX_SHADER == m_type*/)
+						BX_WARN(s_extension[Extension::ARB_shader_texture_lod].m_supported
+							, "ARB_shader_texture_lod is used but not supported by GLES2 driver."
+							);
+
+						if (s_extension[Extension::ARB_shader_texture_lod].m_supported)
 						{
 							writeString(&writer
-								, "#extension GL_EXT_shader_texture_lod : enable\n"
-								  "#define texture2DLod texture2DLodEXT\n"
-								  "#define texture2DProjLod texture2DProjLodEXT\n"
-								  "#define textureCubeLod textureCubeLodEXT\n"
+								, "#extension GL_ARB_shader_texture_lod : enable\n"
+								  "#define texture2DLod texture2DLodARB\n"
+								  "#define texture2DProjLod texture2DProjLodARB\n"
+								  "#define textureCubeLod textureCubeLodARB\n"
+								  "#define texture2DGrad texture2DGradARB\n"
+								  "#define texture2DProjGrad texture2DProjGradARB\n"
+								  "#define textureCubeGrad textureCubeGradARB\n"
 								);
 						}
 						else
@@ -5578,7 +5590,7 @@ namespace bgfx { namespace gl
 					const bool usesPacking      = !!bx::findIdentifierMatch(code, s_ARB_shading_language_packing);
 
 					uint32_t version =
-						  usesIUsamplers || usesTexelFetch ? 130
+						  usesIUsamplers || usesTexelFetch || usesGpuShader5 ? 130
 						: usesTextureLod ? 120
 						: 120
 						;
@@ -5592,7 +5604,12 @@ namespace bgfx { namespace gl
 					{
 						if (m_type == GL_FRAGMENT_SHADER)
 						{
-							writeString(&writer, "#extension GL_ARB_shader_texture_lod : enable\n");
+							writeString(&writer
+								, "#extension GL_ARB_shader_texture_lod : enable\n"
+								  "#define texture2DGrad texture2DGradARB\n"
+								  "#define texture2DProjGrad texture2DProjGradARB\n"
+								  "#define textureCubeGrad textureCubeGradARB\n"
+								);
 						}
 					}
 
@@ -5694,9 +5711,12 @@ namespace bgfx { namespace gl
 						writeString(&writer, "#version 140\n");
 					}
 
-					writeString(&writer, "#define texture2DLod textureLod\n");
-					writeString(&writer, "#define texture3DLod textureLod\n");
-					writeString(&writer, "#define textureCubeLod textureLod\n");
+					writeString(&writer, "#define texture2DLod    textureLod\n");
+					writeString(&writer, "#define texture3DLod    textureLod\n");
+					writeString(&writer, "#define textureCubeLod  textureLod\n");
+					writeString(&writer, "#define texture2DGrad   textureGrad\n");
+					writeString(&writer, "#define texture3DGrad   textureGrad\n");
+					writeString(&writer, "#define textureCubeGrad textureGrad\n");
 
 					if (m_type == GL_FRAGMENT_SHADER)
 					{
@@ -7145,7 +7165,6 @@ namespace bgfx { namespace gl
 							for (size_t ii = 0; ii < BGFX_CONFIG_MAX_VERTEX_STREAMS; ++ii)
 							{
 								currentState.m_stream[ii].m_handle.idx = invalidHandle;
-								currentState.m_stream[ii].m_startVertex = 0;
 							}
 							currentState.m_indexBuffer.idx = invalidHandle;
 							bindAttribs = true;
@@ -7189,8 +7208,9 @@ namespace bgfx { namespace gl
 								idx         += ntz;
 
 								currentState.m_stream[idx].m_handle = draw.m_stream[idx].m_handle;
-								currentState.m_stream[idx].m_startVertex = draw.m_stream[idx].m_startVertex;
 							}
+
+							bindAttribs = true;
 						}
 
 						if (currentState.m_indexBuffer.idx != draw.m_indexBuffer.idx)
@@ -7238,12 +7258,12 @@ namespace bgfx { namespace gl
 									streamMask >>= ntz;
 									idx         += ntz;
 
-									const Stream& stream = draw.m_stream[idx];
+									currentState.m_stream[idx].m_startVertex = draw.m_stream[idx].m_startVertex;
 
-									const VertexBufferGL& vb = m_vertexBuffers[stream.m_handle.idx];
-									uint16_t decl = !isValid(vb.m_decl) ? stream.m_decl.idx : vb.m_decl.idx;
+									const VertexBufferGL& vb = m_vertexBuffers[draw.m_stream[idx].m_handle.idx];
+									uint16_t decl = !isValid(vb.m_decl) ? draw.m_stream[idx].m_decl.idx : vb.m_decl.idx;
 									GL_CHECK(glBindBuffer(GL_ARRAY_BUFFER, vb.m_id) );
-									program.bindAttributes(m_vertexDecls[decl], stream.m_startVertex);
+									program.bindAttributes(m_vertexDecls[decl], draw.m_stream[idx].m_startVertex);
 								}
 								program.bindAttributesEnd();
 
@@ -7269,10 +7289,8 @@ namespace bgfx { namespace gl
 								streamMask >>= ntz;
 								idx         += ntz;
 
-								const Stream& stream = currentState.m_stream[idx];
-
-								const VertexBufferGL& vb = m_vertexBuffers[stream.m_handle.idx];
-								uint16_t decl = !isValid(vb.m_decl) ? stream.m_decl.idx : vb.m_decl.idx;
+								const VertexBufferGL& vb = m_vertexBuffers[draw.m_stream[idx].m_handle.idx];
+								uint16_t decl = !isValid(vb.m_decl) ? draw.m_stream[idx].m_decl.idx : vb.m_decl.idx;
 								const VertexDecl& vertexDecl = m_vertexDecls[decl];
 
 								numVertices = bx::uint32_min(numVertices, vb.m_size/vertexDecl.m_stride);
