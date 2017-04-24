@@ -24,7 +24,7 @@
 #include <string>
 namespace stl = tinystl;
 
-#include "image.h"
+#include <bimg/decode.h>
 
 #include <bgfx/embedded_shader.h>
 
@@ -312,14 +312,14 @@ struct View
 			{
 				if (0 == (item->d_type & DT_DIR) )
 				{
-					const char* ext = strrchr(item->d_name, '.');
+					const char* ext = bx::strRFind(item->d_name, '.');
 					if (NULL != ext)
 					{
 						ext += 1;
 						bool supported = false;
 						for (uint32_t ii = 0; ii < BX_COUNTOF(s_supportedExt); ++ii)
 						{
-							if (0 == bx::strincmp(ext, s_supportedExt[ii]) )
+							if (0 == bx::strCmpI(ext, s_supportedExt[ii]) )
 							{
 								supported = true;
 								break;
@@ -856,13 +856,20 @@ int _main_(int _argc, char** _argv)
 						);
 
 				std::string title;
-				bx::stringPrintf(title, "%s (%d x %d%s, %s)"
-					, filePath
-					, view.m_info.width
-					, view.m_info.height
-					, view.m_info.cubeMap ? " CubeMap" : ""
-					, bgfx::getName(view.m_info.format)
-					);
+				if (isValid(texture) )
+				{
+					bx::stringPrintf(title, "%s (%d x %d%s, %s)"
+						, filePath
+						, view.m_info.width
+						, view.m_info.height
+						, view.m_info.cubeMap ? " CubeMap" : ""
+						, bimg::getName(bimg::TextureFormat::Enum(view.m_info.format) )
+						);
+				}
+				else
+				{
+					bx::stringPrintf(title, "Failed to load %s!", filePath);
+				}
 				entry::WindowHandle handle = { 0 };
 				entry::setWindowTitle(handle, title.c_str() );
 			}

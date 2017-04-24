@@ -359,7 +359,7 @@ inline bool IsValid(const char* cname, char retOrder, char retType, char argOrde
     const std::string name(cname);
 
     // these do not have vec1 versions
-    if (dim0 == 1 && (name == "length" || name == "normalize" || name == "reflect" || name == "refract"))
+    if (dim0 == 1 && (name == "normalize" || name == "reflect" || name == "refract"))
         return false;
 
     if (!IsTextureType(argOrder) && (isVec && dim0 == 1)) // avoid vec1
@@ -625,7 +625,7 @@ void TBuiltInParseablesHlsl::initialize(int /*version*/, EProfile /*profile*/, c
         { "isinf",                            nullptr, "B" ,      "SVM",            "F",             EShLangAll,    false },
         { "isnan",                            nullptr, "B" ,      "SVM",            "F",             EShLangAll,    false },
         { "ldexp",                            nullptr, nullptr,   "SVM,",           "F,",            EShLangAll,    false },
-        { "length",                           "S",     "F",       "V",              "F",             EShLangAll,    false },
+        { "length",                           "S",     "F",       "SV",             "F",             EShLangAll,    false },
         { "lerp",                             nullptr, nullptr,   "VM,,",           "F,,",           EShLangAll,    false },
         { "lerp",                             nullptr, nullptr,   "SVM,,S",         "F,,",           EShLangAll,    false },
         { "lit",                              "V4",    "F",       "S,,",            "F,,",           EShLangAll,    false },
@@ -871,6 +871,9 @@ void TBuiltInParseablesHlsl::initialize(int /*version*/, EProfile /*profile*/, c
         { "InterlockedMin",                   nullptr, nullptr,   "-",              "-",              EShLangAll,   true },
         { "InterlockedOr",                    nullptr, nullptr,   "-",              "-",              EShLangAll,   true },
         { "InterlockedXor",                   nullptr, nullptr,   "-",              "-",              EShLangAll,   true },
+        { "IncrementCounter",                 nullptr, nullptr,   "-",              "-",              EShLangAll,   true },
+        { "DecrementCounter",                 nullptr, nullptr,   "-",              "-",              EShLangAll,   true },
+        { "Consume",                          nullptr, nullptr,   "-",              "-",              EShLangAll,   true },
 
         // Mark end of list, since we want to avoid a range-based for, as some compilers don't handle it yet.
         { nullptr,                            nullptr, nullptr,   nullptr,      nullptr,  0, false },
@@ -1180,6 +1183,10 @@ void TBuiltInParseablesHlsl::identifyBuiltIns(int /*version*/, EProfile /*profil
     symbolTable.relateToOperator(BUILTIN_PREFIX "Store2",                      EOpMethodStore2);
     symbolTable.relateToOperator(BUILTIN_PREFIX "Store3",                      EOpMethodStore3);
     symbolTable.relateToOperator(BUILTIN_PREFIX "Store4",                      EOpMethodStore4);
+    symbolTable.relateToOperator(BUILTIN_PREFIX "IncrementCounter",            EOpMethodIncrementCounter);
+    symbolTable.relateToOperator(BUILTIN_PREFIX "DecrementCounter",            EOpMethodDecrementCounter);
+    // Append is also a GS method: we don't add it twice
+    symbolTable.relateToOperator(BUILTIN_PREFIX "Consume",                     EOpMethodConsume);
 
     symbolTable.relateToOperator(BUILTIN_PREFIX "InterlockedAdd",              EOpInterlockedAdd);
     symbolTable.relateToOperator(BUILTIN_PREFIX "InterlockedAnd",              EOpInterlockedAnd);

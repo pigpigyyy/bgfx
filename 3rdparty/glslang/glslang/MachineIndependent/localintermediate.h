@@ -175,9 +175,13 @@ public:
         shiftImageBinding(0),
         shiftUboBinding(0),
         shiftSsboBinding(0),
+        shiftUavBinding(0),
         autoMapBindings(false),
         flattenUniformArrays(false),
-        useUnknownFormat(false)
+        useUnknownFormat(false),
+        hlslOffsets(false),
+        useStorageBuffer(false),
+        hlslIoMapping(false)
     {
         localSize[0] = 1;
         localSize[1] = 1;
@@ -210,12 +214,20 @@ public:
     unsigned int getShiftUboBinding()     const { return shiftUboBinding; }
     void setShiftSsboBinding(unsigned int shift)     { shiftSsboBinding = shift; }
     unsigned int getShiftSsboBinding()  const { return shiftSsboBinding; }
+    void setShiftUavBinding(unsigned int shift) { shiftUavBinding = shift; }
+    unsigned int getShiftUavBinding()  const { return shiftUavBinding; }
     void setAutoMapBindings(bool map)               { autoMapBindings = map; }
     bool getAutoMapBindings()             const { return autoMapBindings; }
     void setFlattenUniformArrays(bool flatten)      { flattenUniformArrays = flatten; }
     bool getFlattenUniformArrays()        const { return flattenUniformArrays; }
     void setNoStorageFormat(bool b)             { useUnknownFormat = b; }
     bool getNoStorageFormat()             const { return useUnknownFormat; }
+    void setHlslOffsets()         { hlslOffsets = true; }
+    bool usingHlslOFfsets() const { return hlslOffsets; }
+    void setUseStorageBuffer() { useStorageBuffer = true; }
+    bool usingStorageBuffer() const { return useStorageBuffer; }
+    void setHlslIoMapping(bool b) { hlslIoMapping = b; }
+    bool usingHlslIoMapping()     { return hlslIoMapping; }
 
     void setVersion(int v) { version = v; }
     int getVersion() const { return version; }
@@ -240,7 +252,9 @@ public:
     TIntermSymbol* addSymbol(const TType&, const TSourceLoc&);
     TIntermSymbol* addSymbol(const TIntermSymbol&);
     TIntermTyped* addConversion(TOperator, const TType&, TIntermTyped*) const;
-    TIntermTyped* addShapeConversion(TOperator, const TType&, TIntermTyped*);
+    TIntermTyped* addUniShapeConversion(TOperator, const TType&, TIntermTyped*);
+    void addBiShapeConversion(TOperator, TIntermTyped*& lhsNode, TIntermTyped*& rhsNode);
+    TIntermTyped* addShapeConversion(const TType&, TIntermTyped*);
     TIntermTyped* addBinaryMath(TOperator, TIntermTyped* left, TIntermTyped* right, TSourceLoc);
     TIntermTyped* addAssign(TOperator op, TIntermTyped* left, TIntermTyped* right, TSourceLoc);
     TIntermTyped* addIndex(TOperator op, TIntermTyped* base, TIntermTyped* index, TSourceLoc);
@@ -413,7 +427,9 @@ public:
     }
     int addXfbBufferOffset(const TType&);
     unsigned int computeTypeXfbSize(const TType&, bool& containsDouble) const;
+    static int getBaseAlignmentScalar(const TType&, int& size);
     static int getBaseAlignment(const TType&, int& size, int& stride, bool std140, bool rowMajor);
+    static bool improperStraddle(const TType& type, int size, int offset);
     bool promote(TIntermOperator*);
 
 #ifdef NV_EXTENSIONS
@@ -443,7 +459,6 @@ protected:
     void inOutLocationCheck(TInfoSink&);
     TIntermSequence& findLinkerObjects() const;
     bool userOutputUsed() const;
-    static int getBaseAlignmentScalar(const TType&, int& size);
     bool isSpecializationOperation(const TIntermOperator&) const;
     bool promoteUnary(TIntermUnary&);
     bool promoteBinary(TIntermBinary&);
@@ -496,9 +511,13 @@ protected:
     unsigned int shiftImageBinding;
     unsigned int shiftUboBinding;
     unsigned int shiftSsboBinding;
+    unsigned int shiftUavBinding;
     bool autoMapBindings;
     bool flattenUniformArrays;
     bool useUnknownFormat;
+    bool hlslOffsets;
+    bool useStorageBuffer;
+    bool hlslIoMapping;
 
     typedef std::list<TCall> TGraph;
     TGraph callGraph;
