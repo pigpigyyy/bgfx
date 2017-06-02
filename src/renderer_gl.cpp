@@ -1576,6 +1576,13 @@ namespace bgfx { namespace gl
 				s_extension[Extension::ARB_shader_storage_buffer_object].m_initialize = false;
 			}
 
+			if (BX_ENABLED(BGFX_CONFIG_RENDERER_OPENGLES)
+			&&  0    == bx::strCmp(m_vendor,  "Imagination Technologies")
+			&&  NULL != bx::strFind(m_version, "1.8@905891") )
+			{
+				m_workaround.m_detachShader = false;
+			}
+
 			if (BX_ENABLED(BGFX_CONFIG_RENDERER_USE_EXTENSIONS) )
 			{
 				const char* extensions = (const char*)glGetString(GL_EXTENSIONS);
@@ -2029,15 +2036,6 @@ namespace bgfx { namespace gl
 				|| s_extension[Extension::ARB_vertex_array_object].m_supported
 				|| s_extension[Extension::OES_vertex_array_object].m_supported
 				;
-
-			if (BX_ENABLED(BX_PLATFORM_NACL) )
-			{
-				m_vaoSupport &= true
-					&& NULL != glGenVertexArrays
-					&& NULL != glDeleteVertexArrays
-					&& NULL != glBindVertexArray
-					;
-			}
 
 			if (m_vaoSupport)
 			{
@@ -5535,7 +5533,8 @@ namespace bgfx { namespace gl
 					if (usesTextureLod)
 					{
 						BX_WARN(s_extension[Extension::ARB_shader_texture_lod].m_supported
-							, "ARB_shader_texture_lod is used but not supported by GLES2 driver."
+							|| s_extension[Extension::EXT_shader_texture_lod].m_supported
+							, "(ARB|EXT)_shader_texture_lod is used but not supported by GLES2 driver."
 							);
 
 						if (s_extension[Extension::ARB_shader_texture_lod].m_supported)
@@ -5552,11 +5551,23 @@ namespace bgfx { namespace gl
 						}
 						else
 						{
-							writeString(&writer
-								, "#define texture2DLod(_sampler, _coord, _level) texture2D(_sampler, _coord)\n"
-								  "#define texture2DProjLod(_sampler, _coord, _level) texture2DProj(_sampler, _coord)\n"
-								  "#define textureCubeLod(_sampler, _coord, _level) textureCube(_sampler, _coord)\n"
+							if(s_extension[Extension::EXT_shader_texture_lod].m_supported)
+							{
+								writeString(&writer
+								, "#extension GL_EXT_shader_texture_lod : enable\n"
+								  "#define texture2DLod texture2DLodEXT\n"
+								  "#define texture2DProjLod texture2DProjLodEXT\n"
+								  "#define textureCubeLod textureCubeLodEXT\n"
 								);
+							}
+							else
+							{
+								writeString(&writer
+									, "#define texture2DLod(_sampler, _coord, _level) texture2D(_sampler, _coord)\n"
+										"#define texture2DProjLod(_sampler, _coord, _level) texture2DProj(_sampler, _coord)\n"
+										"#define textureCubeLod(_sampler, _coord, _level) textureCube(_sampler, _coord)\n"
+									);
+							}
 						}
 					}
 
@@ -5665,7 +5676,10 @@ namespace bgfx { namespace gl
 
 					if (usesTextureArray)
 					{
-						writeString(&writer, "#extension GL_EXT_texture_array : enable\n");
+						writeString(&writer
+							, "#extension GL_EXT_texture_array : enable\n"
+							  "#define texture2DArrayLodEXT texture2DArrayLod\n"
+							);
 					}
 
 					if (130 <= version)

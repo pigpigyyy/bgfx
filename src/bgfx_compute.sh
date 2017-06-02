@@ -10,7 +10,48 @@
 
 #ifndef __cplusplus
 
-#if BGFX_SHADER_LANGUAGE_HLSL
+#if BGFX_SHADER_LANGUAGE_GLSL
+
+#define SHARED shared
+
+#define __IMAGE_XX(_name, _format, _reg, _image, _access) \
+			layout(_format, binding=_reg) _access uniform highp _image _name
+
+#define readwrite
+#define IMAGE2D_RO( _name, _format, _reg) __IMAGE_XX(_name, _format, _reg, image2D,  readonly)
+#define UIMAGE2D_RO(_name, _format, _reg) __IMAGE_XX(_name, _format, _reg, uimage2D, readonly)
+#define IMAGE2D_WR( _name, _format, _reg) __IMAGE_XX(_name, _format, _reg, image2D,  writeonly)
+#define UIMAGE2D_WR(_name, _format, _reg) __IMAGE_XX(_name, _format, _reg, uimage2D, writeonly)
+#define IMAGE2D_RW( _name, _format, _reg) __IMAGE_XX(_name, _format, _reg, image2D,  readwrite)
+#define UIMAGE2D_RW(_name, _format, _reg) __IMAGE_XX(_name, _format, _reg, uimage2D, readwrite)
+
+#define IMAGE2D_ARRAY_RO( _name, _format, _reg) __IMAGE_XX(_name, _format, _reg, image2DArray,  readonly)
+#define UIMAGE2D_ARRAY_RO(_name, _format, _reg) __IMAGE_XX(_name, _format, _reg, uimage2DArray, readonly)
+#define IMAGE2D_ARRAY_WR( _name, _format, _reg) __IMAGE_XX(_name, _format, _reg, image2DArray,  writeonly)
+#define UIMAGE2D_ARRAY_WR(_name, _format, _reg) __IMAGE_XX(_name, _format, _reg, uimage2DArray, writeonly)
+#define IMAGE2D_ARRAY_RW( _name, _format, _reg) __IMAGE_XX(_name, _format, _reg, image2DArray,  readwrite)
+#define UIMAGE2D_ARRAY_RW(_name, _format, _reg) __IMAGE_XX(_name, _format, _reg, uimage2DArray, readwrite)
+
+#define IMAGE3D_RO( _name, _format, _reg) __IMAGE_XX(_name, _format, _reg, image3D,  readonly)
+#define UIMAGE3D_RO(_name, _format, _reg) __IMAGE_XX(_name, _format, _reg, uimage3D, readonly)
+#define IMAGE3D_WR( _name, _format, _reg) __IMAGE_XX(_name, _format, _reg, image3D,  writeonly)
+#define UIMAGE3D_WR(_name, _format, _reg) __IMAGE_XX(_name, _format, _reg, uimage3D, writeonly)
+#define IMAGE3D_RW( _name, _format, _reg) __IMAGE_XX(_name, _format, _reg, image3D,  readwrite)
+#define UIMAGE3D_RW(_name, _format, _reg) __IMAGE_XX(_name, _format, _reg, uimage3D, readwrite)
+
+#define __BUFFER_XX(_name, _type, _reg, _access)                        \
+			layout(std430, binding=_reg) _access buffer _name ## Buffer \
+			{                                                           \
+				_type _name[];                                          \
+			}
+
+#define BUFFER_RO(_name, _type, _reg) __BUFFER_XX(_name, _type, _reg, readonly)
+#define BUFFER_RW(_name, _type, _reg) __BUFFER_XX(_name, _type, _reg, readwrite)
+#define BUFFER_WR(_name, _type, _reg) __BUFFER_XX(_name, _type, _reg, writeonly)
+
+#define NUM_THREADS(_x, _y, _z) layout (local_size_x = _x, local_size_y = _y, local_size_z = _z) in;
+
+#else
 
 #define SHARED groupshared
 
@@ -20,32 +61,36 @@
 #define r32f     float
 #define rg16f    float2
 #define rgba16f  float4
-#define rgba8    float4
+#if BGFX_SHADER_LANGUAGE_HLSL
+#	define rgba8 unorm float4
+#else
+#	define rgba8       float4
+#endif // BGFX_SHADER_LANGUAGE_HLSL
 #define rgba32f  float4
 
-#define IMAGE2D_RO( _name, _format, _reg)   Texture2D<_format> _name : register(t[_reg])
-#define UIMAGE2D_RO(_name, _format, _reg)   Texture2D<_format> _name : register(t[_reg])
-#define IMAGE2D_WR( _name, _format, _reg) RWTexture2D<_format> _name : register(u[_reg])
-#define UIMAGE2D_WR(_name, _format, _reg) RWTexture2D<_format> _name : register(u[_reg])
-#define IMAGE2D_RW( _name, _format, _reg) RWTexture2D<_format> _name : register(u[_reg])
-#define UIMAGE2D_RW(_name, _format, _reg) RWTexture2D<_format> _name : register(u[_reg])
+#define IMAGE2D_RO( _name, _format, _reg)   Texture2D<_format> _name : REGISTER(t, _reg)
+#define UIMAGE2D_RO(_name, _format, _reg)   Texture2D<_format> _name : REGISTER(t, _reg)
+#define IMAGE2D_WR( _name, _format, _reg) RWTexture2D<_format> _name : REGISTER(u, _reg)
+#define UIMAGE2D_WR(_name, _format, _reg) RWTexture2D<_format> _name : REGISTER(u, _reg)
+#define IMAGE2D_RW( _name, _format, _reg) RWTexture2D<_format> _name : REGISTER(u, _reg)
+#define UIMAGE2D_RW(_name, _format, _reg) RWTexture2D<_format> _name : REGISTER(u, _reg)
 
-#define IMAGE2D_ARRAY_RO( _name, _format, _reg)   Texture2DArray<_format> _name : register(t[_reg])
-#define UIMAGE2D_ARRAY_RO(_name, _format, _reg)   Texture2DArray<_format> _name : register(t[_reg])
-#define IMAGE2D_ARRAY_WR( _name, _format, _reg) RWTexture2DArray<_format> _name : register(u[_reg])
-#define UIMAGE2D_ARRAY_WR(_name, _format, _reg) RWTexture2DArray<_format> _name : register(u[_reg])
-#define IMAGE2D_ARRAY_RW( _name, _format, _reg) RWTexture2DArray<_format> _name : register(u[_reg])
-#define UIMAGE2D_ARRAY_RW(_name, _format, _reg) RWTexture2DArray<_format> _name : register(u[_reg])
+#define IMAGE2D_ARRAY_RO( _name, _format, _reg)   Texture2DArray<_format> _name : REGISTER(t, _reg)
+#define UIMAGE2D_ARRAY_RO(_name, _format, _reg)   Texture2DArray<_format> _name : REGISTER(t, _reg)
+#define IMAGE2D_ARRAY_WR( _name, _format, _reg) RWTexture2DArray<_format> _name : REGISTER(u, _reg)
+#define UIMAGE2D_ARRAY_WR(_name, _format, _reg) RWTexture2DArray<_format> _name : REGISTER(u, _reg)
+#define IMAGE2D_ARRAY_RW( _name, _format, _reg) RWTexture2DArray<_format> _name : REGISTER(u, _reg)
+#define UIMAGE2D_ARRAY_RW(_name, _format, _reg) RWTexture2DArray<_format> _name : REGISTER(u, _reg)
 
-#define IMAGE3D_RO( _name, _format, _reg)   Texture3D<_format> _name : register(t[_reg])
-#define UIMAGE3D_RO(_name, _format, _reg)   Texture3D<_format> _name : register(t[_reg])
-#define IMAGE3D_WR( _name, _format, _reg) RWTexture3D<_format> _name : register(u[_reg])
-#define UIMAGE3D_WR(_name, _format, _reg) RWTexture3D<_format> _name : register(u[_reg])
-#define IMAGE3D_RW( _name, _format, _reg) RWTexture3D<_format> _name : register(u[_reg])
-#define UIMAGE3D_RW(_name, _format, _reg) RWTexture3D<_format> _name : register(u[_reg])
+#define IMAGE3D_RO( _name, _format, _reg)   Texture3D<_format> _name : REGISTER(t, _reg)
+#define UIMAGE3D_RO(_name, _format, _reg)   Texture3D<_format> _name : REGISTER(t, _reg)
+#define IMAGE3D_WR( _name, _format, _reg) RWTexture3D<_format> _name : REGISTER(u, _reg)
+#define UIMAGE3D_WR(_name, _format, _reg) RWTexture3D<_format> _name : REGISTER(u, _reg)
+#define IMAGE3D_RW( _name, _format, _reg) RWTexture3D<_format> _name : REGISTER(u, _reg)
+#define UIMAGE3D_RW(_name, _format, _reg) RWTexture3D<_format> _name : REGISTER(u, _reg)
 
-#define BUFFER_RO(_name, _struct, _reg) Buffer<_struct>   _name : register(t[_reg])
-#define BUFFER_RW(_name, _struct, _reg) RWBuffer<_struct> _name : register(u[_reg])
+#define BUFFER_RO(_name, _struct, _reg) Buffer<_struct>   _name : REGISTER(t, _reg)
+#define BUFFER_RW(_name, _struct, _reg) RWBuffer<_struct> _name : REGISTER(u, _reg)
 #define BUFFER_WR(_name, _struct, _reg) BUFFER_RW(_name, _struct, _reg)
 
 #define NUM_THREADS(_x, _y, _z) [numthreads(_x, _y, _z)]
@@ -59,24 +104,30 @@
 	void imageStore(     RWTexture2D<_textureType> _image, ivec2 _uv,  _type _value) { _image[_uv ] = _value._storeComponents; } \
 	void imageStore(RWTexture2DArray<_textureType> _image, ivec3 _uvw, _type _value) { _image[_uvw] = _value._storeComponents; } \
 	void imageStore(     RWTexture3D<_textureType> _image, ivec3 _uvw, _type _value) { _image[_uvw] = _value._storeComponents; } \
-	ivec2 imageSize(       Texture2D<_textureType> _image)                           { ivec2 result; _image.GetDimensions(result.x, result.y); return result; } \
-	ivec2 imageSize(     RWTexture2D<_textureType> _image)                           { ivec2 result; _image.GetDimensions(result.x, result.y); return result; } \
-	ivec3 imageSize(RWTexture2DArray<_textureType> _image)                           { ivec3 result; _image.GetDimensions(result.x, result.y, result.z); return result; } \
-	ivec3 imageSize(       Texture3D<_textureType> _image)                           { ivec3 result; _image.GetDimensions(result.x, result.y, result.z); return result; } \
-	ivec3 imageSize(     RWTexture3D<_textureType> _image)                           { ivec3 result; _image.GetDimensions(result.x, result.y, result.z); return result; }
+	ivec2 imageSize(       Texture2D<_textureType> _image)                           { uvec2 result; _image.GetDimensions(result.x, result.y);           return ivec2(result); } \
+	ivec2 imageSize(     RWTexture2D<_textureType> _image)                           { uvec2 result; _image.GetDimensions(result.x, result.y);           return ivec2(result); } \
+	ivec3 imageSize(RWTexture2DArray<_textureType> _image)                           { uvec3 result; _image.GetDimensions(result.x, result.y, result.z); return ivec3(result); } \
+	ivec3 imageSize(       Texture3D<_textureType> _image)                           { uvec3 result; _image.GetDimensions(result.x, result.y, result.z); return ivec3(result); } \
+	ivec3 imageSize(     RWTexture3D<_textureType> _image)                           { uvec3 result; _image.GetDimensions(result.x, result.y, result.z); return ivec3(result); }
 
-__IMAGE_IMPL(float, x,    vec4,  xxxx)
-__IMAGE_IMPL(vec2,  xy,   vec4,  xyyy)
-__IMAGE_IMPL(vec3,  xyz,  vec4,  xyzz)
-__IMAGE_IMPL(vec4,  xyzw, vec4,  xyzw)
-__IMAGE_IMPL(uint,  x,    uvec4, xxxx)
-__IMAGE_IMPL(uvec2, xy,   uvec4, xyyy)
-__IMAGE_IMPL(uvec3, xyz,  uvec4, xyzz)
-__IMAGE_IMPL(uvec4, xyzw, uvec4, xyzw)
-__IMAGE_IMPL(int,   x,    ivec4, xxxx)
-__IMAGE_IMPL(ivec2, xy,   ivec4, xyyy)
-__IMAGE_IMPL(ivec3, xyz,  ivec4, xyzz)
-__IMAGE_IMPL(ivec4, xyzw, ivec4, xyzw)
+__IMAGE_IMPL(float,       x,    vec4,  xxxx)
+__IMAGE_IMPL(vec2,        xy,   vec4,  xyyy)
+__IMAGE_IMPL(vec3,        xyz,  vec4,  xyzz)
+__IMAGE_IMPL(vec4,        xyzw, vec4,  xyzw)
+#if BGFX_SHADER_LANGUAGE_HLSL
+__IMAGE_IMPL(unorm float, x,    vec4,  xxxx)
+__IMAGE_IMPL(unorm vec2,  xy,   vec4,  xyyy)
+__IMAGE_IMPL(unorm vec3,  xyz,  vec4,  xyzz)
+__IMAGE_IMPL(unorm vec4,  xyzw, vec4,  xyzw)
+#endif // BGFX_SHADER_LANGUAGE_HLSL
+__IMAGE_IMPL(uint,        x,    uvec4, xxxx)
+__IMAGE_IMPL(uvec2,       xy,   uvec4, xyyy)
+__IMAGE_IMPL(uvec3,       xyz,  uvec4, xyzz)
+__IMAGE_IMPL(uvec4,       xyzw, uvec4, xyzw)
+__IMAGE_IMPL(int,         x,    ivec4, xxxx)
+__IMAGE_IMPL(ivec2,       xy,   ivec4, xyyy)
+__IMAGE_IMPL(ivec3,       xyz,  ivec4, xyzz)
+__IMAGE_IMPL(ivec4,       xyzw, ivec4, xyzw)
 
 #define __ATOMIC_IMPL_TYPE(_genType, _glFunc, _dxFunc)      \
 			_genType _glFunc(_genType _mem, _genType _data) \
@@ -122,48 +173,7 @@ uint atomicCompSwap(uint _mem, uint _compare, uint _data)
 #define memoryBarrierShared()        GroupMemoryBarrierWithGroupSync()
 #define groupMemoryBarrier()         GroupMemoryBarrierWithGroupSync()
 
-#else
-
-#define SHARED shared
-
-#define __IMAGE_XX(_name, _format, _reg, _image, _access) \
-			layout(_format, binding=_reg) _access uniform highp _image _name
-
-#define readwrite
-#define IMAGE2D_RO( _name, _format, _reg) __IMAGE_XX(_name, _format, _reg, image2D,  readonly)
-#define UIMAGE2D_RO(_name, _format, _reg) __IMAGE_XX(_name, _format, _reg, uimage2D, readonly)
-#define IMAGE2D_WR( _name, _format, _reg) __IMAGE_XX(_name, _format, _reg, image2D,  writeonly)
-#define UIMAGE2D_WR(_name, _format, _reg) __IMAGE_XX(_name, _format, _reg, uimage2D, writeonly)
-#define IMAGE2D_RW( _name, _format, _reg) __IMAGE_XX(_name, _format, _reg, image2D,  readwrite)
-#define UIMAGE2D_RW(_name, _format, _reg) __IMAGE_XX(_name, _format, _reg, uimage2D, readwrite)
-
-#define IMAGE2D_ARRAY_RO( _name, _format, _reg) __IMAGE_XX(_name, _format, _reg, image2DArray,  readonly)
-#define UIMAGE2D_ARRAY_RO(_name, _format, _reg) __IMAGE_XX(_name, _format, _reg, uimage2DArray, readonly)
-#define IMAGE2D_ARRAY_WR( _name, _format, _reg) __IMAGE_XX(_name, _format, _reg, image2DArray,  writeonly)
-#define UIMAGE2D_ARRAY_WR(_name, _format, _reg) __IMAGE_XX(_name, _format, _reg, uimage2DArray, writeonly)
-#define IMAGE2D_ARRAY_RW( _name, _format, _reg) __IMAGE_XX(_name, _format, _reg, image2DArray,  readwrite)
-#define UIMAGE2D_ARRAY_RW(_name, _format, _reg) __IMAGE_XX(_name, _format, _reg, uimage2DArray, readwrite)
-
-#define IMAGE3D_RO( _name, _format, _reg) __IMAGE_XX(_name, _format, _reg, image3D,  readonly)
-#define UIMAGE3D_RO(_name, _format, _reg) __IMAGE_XX(_name, _format, _reg, uimage3D, readonly)
-#define IMAGE3D_WR( _name, _format, _reg) __IMAGE_XX(_name, _format, _reg, image3D,  writeonly)
-#define UIMAGE3D_WR(_name, _format, _reg) __IMAGE_XX(_name, _format, _reg, uimage3D, writeonly)
-#define IMAGE3D_RW( _name, _format, _reg) __IMAGE_XX(_name, _format, _reg, image3D,  readwrite)
-#define UIMAGE3D_RW(_name, _format, _reg) __IMAGE_XX(_name, _format, _reg, uimage3D, readwrite)
-
-#define __BUFFER_XX(_name, _type, _reg, _access)                        \
-			layout(std430, binding=_reg) _access buffer _name ## Buffer \
-			{                                                           \
-				_type _name[];                                          \
-			}
-
-#define BUFFER_RO(_name, _type, _reg) __BUFFER_XX(_name, _type, _reg, readonly)
-#define BUFFER_RW(_name, _type, _reg) __BUFFER_XX(_name, _type, _reg, readwrite)
-#define BUFFER_WR(_name, _type, _reg) __BUFFER_XX(_name, _type, _reg, writeonly)
-
-#define NUM_THREADS(_x, _y, _z) layout (local_size_x = _x, local_size_y = _y, local_size_z = _z) in;
-
-#endif // BGFX_SHADER_LANGUAGE_HLSL
+#endif // BGFX_SHADER_LANGUAGE_GLSL
 
 #define dispatchIndirect(_buffer \
 			, _offset            \

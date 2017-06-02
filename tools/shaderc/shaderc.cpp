@@ -12,13 +12,16 @@ extern "C"
 #include <fpp.h>
 } // extern "C"
 
+#define BGFX_CHUNK_MAGIC_CSH BX_MAKEFOURCC('C', 'S', 'H', 0x2)
+#define BGFX_CHUNK_MAGIC_FSH BX_MAKEFOURCC('F', 'S', 'H', 0x4)
+#define BGFX_CHUNK_MAGIC_VSH BX_MAKEFOURCC('V', 'S', 'H', 0x4)
+
+#define BGFX_SHADERC_VERSION_MAJOR 1
+#define BGFX_SHADERC_VERSION_MINOR 1
+
 namespace bgfx
 {
 	bool g_verbose = false;
-
-	#define BGFX_CHUNK_MAGIC_CSH BX_MAKEFOURCC('C', 'S', 'H', 0x2)
-	#define BGFX_CHUNK_MAGIC_FSH BX_MAKEFOURCC('F', 'S', 'H', 0x4)
-	#define BGFX_CHUNK_MAGIC_VSH BX_MAKEFOURCC('V', 'S', 'H', 0x4)
 
 	static const char* s_ARB_shader_texture_lod[] =
 	{
@@ -340,7 +343,7 @@ namespace bgfx
 				&&  m_data[1] == '\xbb'
 				&&  m_data[2] == '\xbf')
 				{
-					memmove(m_data, &m_data[3], m_size-3);
+					bx::memMove(m_data, &m_data[3], m_size-3);
 					m_size -= 3;
 				}
 
@@ -616,7 +619,7 @@ namespace bgfx
 		char* scratch(const char* _str)
 		{
 			char* result = &m_scratch[m_scratchPos];
-			strcpy(result, _str);
+			bx::strCopy(result, uint32_t(sizeof(m_scratch)-m_scratchPos), _str);
 			m_scratchPos += (uint32_t)bx::strLen(_str)+1;
 
 			return result;
@@ -725,9 +728,12 @@ namespace bgfx
 		}
 
 		fprintf(stderr
-			, "shaderc, bgfx shader compiler tool\n"
+			, "shaderc, bgfx shader compiler tool, version %d.%d.%d.\n"
 			  "Copyright 2011-2017 Branimir Karadzic. All rights reserved.\n"
 			  "License: https://github.com/bkaradzic/bgfx#license-bsd-2-clause\n\n"
+			, BGFX_SHADERC_VERSION_MAJOR
+			, BGFX_SHADERC_VERSION_MINOR
+			, BGFX_API_VERSION
 			);
 
 		fprintf(stderr
@@ -735,6 +741,8 @@ namespace bgfx
 
 			  "\n"
 			  "Options:\n"
+			  "  -h, --help                    Help.\n"
+			  "  -v, --version                 Version information only.\n"
 			  "  -f <file path>                Input file path.\n"
 			  "  -i <include path>             Include path (for multiple paths use use -i multiple times).\n"
 			  "  -o <file path>                Output file path.\n"
@@ -773,6 +781,17 @@ namespace bgfx
 	int compileShader(int _argc, const char* _argv[])
 	{
 		bx::CommandLine cmdLine(_argc, _argv);
+
+		if (cmdLine.hasArg('v', "version") )
+		{
+			fprintf(stderr
+				, "shaderc, bgfx shader compiler tool, version %d.%d.%d.\n"
+				, BGFX_SHADERC_VERSION_MAJOR
+				, BGFX_SHADERC_VERSION_MINOR
+				, BGFX_API_VERSION
+				);
+			return EXIT_SUCCESS;
+		}
 
 		if (cmdLine.hasArg('h', "help") )
 		{
@@ -933,7 +952,6 @@ namespace bgfx
 		preprocessor.setDefaultDefine("BX_PLATFORM_EMSCRIPTEN");
 		preprocessor.setDefaultDefine("BX_PLATFORM_IOS");
 		preprocessor.setDefaultDefine("BX_PLATFORM_LINUX");
-		preprocessor.setDefaultDefine("BX_PLATFORM_NACL");
 		preprocessor.setDefaultDefine("BX_PLATFORM_OSX");
 		preprocessor.setDefaultDefine("BX_PLATFORM_PS4");
 		preprocessor.setDefaultDefine("BX_PLATFORM_WINDOWS");
@@ -983,11 +1001,6 @@ namespace bgfx
 			{
 				preprocessor.setDefine(glslDefine);
 			}
-		}
-		else if (0 == bx::strCmpI(platform, "nacl") )
-		{
-			preprocessor.setDefine("BX_PLATFORM_NACL=1");
-			preprocessor.setDefine("BGFX_SHADER_LANGUAGE_GLSL=1");
 		}
 		else if (0 == bx::strCmpI(platform, "osx") )
 		{
@@ -1160,14 +1173,14 @@ namespace bgfx
 				&&  data[1] == '\xbb'
 				&&  data[2] == '\xbf')
 				{
-					memmove(data, &data[3], size-3);
+					bx::memMove(data, &data[3], size-3);
 					size -= 3;
 				}
 
 				// Compiler generates "error X3000: syntax error: unexpected end of file"
 				// if input doesn't have empty line at EOF.
 				data[size] = '\n';
-				memset(&data[size+1], 0, padding);
+				bx::memSet(&data[size+1], 0, padding);
 				bx::close(&reader);
 
 				if (!raw)
@@ -1180,8 +1193,8 @@ namespace bgfx
 
 					size = (uint32_t)preprocessor.m_preprocessed.size();
 					data = new char[size+padding+1];
-					memcpy(data, preprocessor.m_preprocessed.c_str(), size);
-					memset(&data[size], 0, padding+1);
+					bx::memCopy(data, preprocessor.m_preprocessed.c_str(), size);
+					bx::memSet(&data[size], 0, padding+1);
 				}
 
 				strNormalizeEol(data);
