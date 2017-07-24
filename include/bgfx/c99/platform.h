@@ -31,7 +31,7 @@ typedef enum bgfx_render_frame
  * allow creating separate rendering thread. If it is called before
  * to bgfx_init, render thread won't be created by bgfx_init call.
  */
-BGFX_C_API bgfx_render_frame_t bgfx_render_frame();
+BGFX_C_API bgfx_render_frame_t bgfx_render_frame(int32_t _msecs);
 
 typedef struct bgfx_platform_data
 {
@@ -66,7 +66,7 @@ BGFX_C_API uintptr_t bgfx_override_internal_texture(bgfx_texture_handle_t _handl
 /**/
 typedef struct bgfx_interface_vtbl
 {
-    bgfx_render_frame_t (*render_frame)();
+    bgfx_render_frame_t (*render_frame)(int32_t _msecs);
     void (*set_platform_data)(const bgfx_platform_data_t* _data);
     const bgfx_internal_data_t* (*get_internal_data)();
     uintptr_t (*override_internal_texture_ptr)(bgfx_texture_handle_t _handle, uintptr_t _ptr);
@@ -157,7 +157,7 @@ typedef struct bgfx_interface_vtbl
     void (*set_view_scissor)(uint8_t _id, uint16_t _x, uint16_t _y, uint16_t _width, uint16_t _height);
     void (*set_view_clear)(uint8_t _id, uint16_t _flags, uint32_t _rgba, float _depth, uint8_t _stencil);
     void (*set_view_clear_mrt)(uint8_t _id, uint16_t _flags, float _depth, uint8_t _stencil, uint8_t _0, uint8_t _1, uint8_t _2, uint8_t _3, uint8_t _4, uint8_t _5, uint8_t _6, uint8_t _7);
-    void (*set_view_seq)(uint8_t _id, bool _enabled);
+    void (*set_view_mode)(uint8_t _id, bgfx_view_mode_t _mode);
     void (*set_view_frame_buffer)(uint8_t _id, bgfx_frame_buffer_handle_t _handle);
     void (*set_view_transform)(uint8_t _id, const void* _view, const void* _proj);
     void (*set_view_transform_stereo)(uint8_t _id, const void* _view, const void* _projL, uint8_t _flags, const void* _projR);

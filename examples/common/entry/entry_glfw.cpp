@@ -228,7 +228,7 @@ namespace entry
 	struct MainThreadEntry
 	{
 		int m_argc;
-		char** m_argv;
+		const char* const* m_argv;
 
 		static int32_t threadFunc(void* _userData);
 	};
@@ -327,6 +327,7 @@ namespace entry
 			s_translateKey[GLFW_KEY_END]          = Key::End;
 			s_translateKey[GLFW_KEY_PRINT_SCREEN] = Key::Print;
 			s_translateKey[GLFW_KEY_KP_ADD]       = Key::Plus;
+			s_translateKey[GLFW_KEY_EQUAL]        = Key::Plus;
 			s_translateKey[GLFW_KEY_KP_SUBTRACT]  = Key::Minus;
 			s_translateKey[GLFW_KEY_MINUS]        = Key::Minus;
 			s_translateKey[GLFW_KEY_COMMA]        = Key::Comma;
@@ -392,7 +393,7 @@ namespace entry
 			s_translateKey[GLFW_KEY_Z]            = Key::KeyZ;
 		}
 
-		int run(int _argc, char** _argv)
+		int run(int _argc, const char* const* _argv)
 		{
 			m_mte.m_argc = _argc;
 			m_mte.m_argv = _argv;
@@ -402,7 +403,7 @@ namespace entry
 			if (!glfwInit() )
 			{
 				DBG("glfwInit failed!");
-				return EXIT_FAILURE;
+				return bx::kExitFailure;
 			}
 
 			glfwSetJoystickCallback(joystickCb);
@@ -421,7 +422,7 @@ namespace entry
 			{
 				DBG("glfwCreateWindow failed!");
 				glfwTerminate();
-				return EXIT_FAILURE;
+				return bx::kExitFailure;
 			}
 
 			glfwSetKeyCallback(m_windows[0], keyCb);
@@ -851,7 +852,7 @@ namespace entry
 	}
 }
 
-int main(int _argc, char** _argv)
+int main(int _argc, const char* const* _argv)
 {
 	using namespace entry;
 	return s_ctx.run(_argc, _argv);
