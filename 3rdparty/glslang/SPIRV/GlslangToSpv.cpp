@@ -1745,6 +1745,20 @@ bool TGlslangToSpvTraverser::visitAggregate(glslang::TVisit visit, glslang::TInt
         atomic = true;
         break;
 
+    case glslang::EOpAtomicCounterAdd:
+    case glslang::EOpAtomicCounterSubtract:
+    case glslang::EOpAtomicCounterMin:
+    case glslang::EOpAtomicCounterMax:
+    case glslang::EOpAtomicCounterAnd:
+    case glslang::EOpAtomicCounterOr:
+    case glslang::EOpAtomicCounterXor:
+    case glslang::EOpAtomicCounterExchange:
+    case glslang::EOpAtomicCounterCompSwap:
+        builder.addExtension("SPV_KHR_shader_atomic_counter_ops");
+        builder.addCapability(spv::CapabilityAtomicStorageOps);
+        atomic = true;
+        break;
+
     default:
         break;
     }
@@ -1815,6 +1829,15 @@ bool TGlslangToSpvTraverser::visitAggregate(glslang::TVisit visit, glslang::TInt
         case glslang::EOpAtomicXor:
         case glslang::EOpAtomicExchange:
         case glslang::EOpAtomicCompSwap:
+        case glslang::EOpAtomicCounterAdd:
+        case glslang::EOpAtomicCounterSubtract:
+        case glslang::EOpAtomicCounterMin:
+        case glslang::EOpAtomicCounterMax:
+        case glslang::EOpAtomicCounterAnd:
+        case glslang::EOpAtomicCounterOr:
+        case glslang::EOpAtomicCounterXor:
+        case glslang::EOpAtomicCounterExchange:
+        case glslang::EOpAtomicCounterCompSwap:
             if (arg == 0)
                 lvalue = true;
             break;
@@ -2531,7 +2554,9 @@ void TGlslangToSpvTraverser::decorateStructType(const glslang::TType& type,
             }
             addMemberDecoration(spvType, member, TranslateInvariantDecoration(memberQualifier));
 
-            if (qualifier.storage == glslang::EvqBuffer) {
+            if (type.getBasicType() == glslang::EbtBlock &&
+                qualifier.storage == glslang::EvqBuffer) {
+                // Add memory decorations only to top-level members of shader storage block
                 std::vector<spv::Decoration> memory;
                 TranslateMemoryDecoration(memberQualifier, memory);
                 for (unsigned int i = 0; i < memory.size(); ++i)
@@ -3345,7 +3370,7 @@ spv::Id TGlslangToSpvTraverser::createImageTextureFunctionCall(glslang::TIntermO
 
     // lod
     if (cracked.lod) {
-        params.lod = arguments[2];
+        params.lod = arguments[2 + extraArgs];
         ++extraArgs;
     } else if (glslangIntermediate->getStage() != EShLangFragment) {
         // we need to invent the default lod for an explicit lod instruction for a non-fragment stage
@@ -3354,7 +3379,7 @@ spv::Id TGlslangToSpvTraverser::createImageTextureFunctionCall(glslang::TIntermO
 
     // multisample
     if (sampler.ms) {
-        params.sample = arguments[2]; // For MS, "sample" should be specified
+        params.sample = arguments[2 + extraArgs]; // For MS, "sample" should be specified
         ++extraArgs;
     }
 
@@ -4617,34 +4642,45 @@ spv::Id TGlslangToSpvTraverser::createAtomicOperation(glslang::TOperator op, spv
     switch (op) {
     case glslang::EOpAtomicAdd:
     case glslang::EOpImageAtomicAdd:
+    case glslang::EOpAtomicCounterAdd:
         opCode = spv::OpAtomicIAdd;
+        break;
+    case glslang::EOpAtomicCounterSubtract:
+        opCode = spv::OpAtomicISub;
         break;
     case glslang::EOpAtomicMin:
     case glslang::EOpImageAtomicMin:
+    case glslang::EOpAtomicCounterMin:
         opCode = typeProxy == glslang::EbtUint ? spv::OpAtomicUMin : spv::OpAtomicSMin;
         break;
     case glslang::EOpAtomicMax:
     case glslang::EOpImageAtomicMax:
+    case glslang::EOpAtomicCounterMax:
         opCode = typeProxy == glslang::EbtUint ? spv::OpAtomicUMax : spv::OpAtomicSMax;
         break;
     case glslang::EOpAtomicAnd:
     case glslang::EOpImageAtomicAnd:
+    case glslang::EOpAtomicCounterAnd:
         opCode = spv::OpAtomicAnd;
         break;
     case glslang::EOpAtomicOr:
     case glslang::EOpImageAtomicOr:
+    case glslang::EOpAtomicCounterOr:
         opCode = spv::OpAtomicOr;
         break;
     case glslang::EOpAtomicXor:
     case glslang::EOpImageAtomicXor:
+    case glslang::EOpAtomicCounterXor:
         opCode = spv::OpAtomicXor;
         break;
     case glslang::EOpAtomicExchange:
     case glslang::EOpImageAtomicExchange:
+    case glslang::EOpAtomicCounterExchange:
         opCode = spv::OpAtomicExchange;
         break;
     case glslang::EOpAtomicCompSwap:
     case glslang::EOpImageAtomicCompSwap:
+    case glslang::EOpAtomicCounterCompSwap:
         opCode = spv::OpAtomicCompareExchange;
         break;
     case glslang::EOpAtomicCounterIncrement:

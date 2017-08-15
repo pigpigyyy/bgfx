@@ -931,7 +931,7 @@ namespace bgfx
 		return m_num;
 	}
 
-	uint32_t Frame::dispatch(uint8_t _id, ProgramHandle _handle, uint16_t _numX, uint16_t _numY, uint16_t _numZ, uint8_t _flags)
+	uint32_t Frame::dispatch(uint8_t _id, ProgramHandle _handle, uint32_t _numX, uint32_t _numY, uint32_t _numZ, uint8_t _flags)
 	{
 		if (m_discard)
 		{
@@ -949,9 +949,9 @@ namespace bgfx
 
 		m_compute.m_matrix = m_draw.m_matrix;
 		m_compute.m_num    = m_draw.m_num;
-		m_compute.m_numX   = bx::uint16_max(_numX, 1);
-		m_compute.m_numY   = bx::uint16_max(_numY, 1);
-		m_compute.m_numZ   = bx::uint16_max(_numZ, 1);
+		m_compute.m_numX   = bx::uint32_max(_numX, 1);
+		m_compute.m_numY   = bx::uint32_max(_numY, 1);
+		m_compute.m_numZ   = bx::uint32_max(_numZ, 1);
 		m_compute.m_submitFlags = _flags;
 
 		m_key.m_program = _handle.idx;
@@ -1513,13 +1513,19 @@ namespace bgfx
 
 		if (BX_ENABLED(BGFX_CONFIG_DEBUG) )
 		{
-#define CHECK_HANDLE_LEAK(_handleAlloc) \
-					BX_MACRO_BLOCK_BEGIN \
-						BX_WARN(0 == _handleAlloc.getNumHandles() \
-							, "LEAK: " #_handleAlloc " %d (max: %d)" \
-							, _handleAlloc.getNumHandles() \
-							, _handleAlloc.getMaxHandles() \
-							); \
+#define CHECK_HANDLE_LEAK(_handleAlloc)                                                               \
+					BX_MACRO_BLOCK_BEGIN                                                              \
+						if (0 != _handleAlloc.getNumHandles() )                                       \
+						{                                                                             \
+							BX_TRACE("LEAK: " #_handleAlloc " %d (max: %d)"                           \
+								, _handleAlloc.getNumHandles()                                        \
+								, _handleAlloc.getMaxHandles()                                        \
+								);                                                                    \
+							for (uint16_t ii = 0, num = _handleAlloc.getNumHandles(); ii < num; ++ii) \
+							{                                                                         \
+								BX_TRACE("\t%3d: %d", ii, _handleAlloc.getHandleAt(ii) );             \
+							}                                                                         \
+						}                                                                             \
 					BX_MACRO_BLOCK_END
 
 			CHECK_HANDLE_LEAK(m_dynamicIndexBufferHandle);
@@ -3147,9 +3153,10 @@ error:
 			srgbCaps = BGFX_CAPS_FORMAT_TEXTURE_3D_SRGB;
 		}
 
-		if (0 != (_flags & BGFX_TEXTURE_RT_MASK) )
+		if (formatSupported
+		&&  0 != (_flags & BGFX_TEXTURE_RT_MASK) )
 		{
-			formatSupported = (g_caps.formats[_format] & (0
+			formatSupported = 0 != (g_caps.formats[_format] & (0
 				| BGFX_CAPS_FORMAT_TEXTURE_FRAMEBUFFER
 				) );
 		}
@@ -3898,7 +3905,7 @@ error:
 		s_ctx->setImage(_stage, _sampler, _handle, _mip, _access, _format);
 	}
 
-	uint32_t dispatch(uint8_t _id, ProgramHandle _handle, uint16_t _numX, uint16_t _numY, uint16_t _numZ, uint8_t _flags)
+	uint32_t dispatch(uint8_t _id, ProgramHandle _handle, uint32_t _numX, uint32_t _numY, uint32_t _numZ, uint8_t _flags)
 	{
 		BGFX_CHECK_MAIN_THREAD();
 		BGFX_CHECK_CAPS(BGFX_CAPS_COMPUTE, "Compute is not supported!");
@@ -4924,7 +4931,7 @@ BGFX_C_API void bgfx_set_compute_indirect_buffer(uint8_t _stage, bgfx_indirect_b
 	bgfx::setBuffer(_stage, handle.cpp, bgfx::Access::Enum(_access) );
 }
 
-BGFX_C_API uint32_t bgfx_dispatch(uint8_t _id, bgfx_program_handle_t _handle, uint16_t _numX, uint16_t _numY, uint16_t _numZ, uint8_t _flags)
+BGFX_C_API uint32_t bgfx_dispatch(uint8_t _id, bgfx_program_handle_t _handle, uint32_t _numX, uint32_t _numY, uint32_t _numZ, uint8_t _flags)
 {
 	union { bgfx_program_handle_t c; bgfx::ProgramHandle cpp; } handle = { _handle };
 	return bgfx::dispatch(_id, handle.cpp, _numX, _numY, _numZ, _flags);

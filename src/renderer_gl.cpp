@@ -1546,7 +1546,12 @@ namespace bgfx { namespace gl
 		return 0 == err;
 	}
 
-	static bool isFramebufferFormatValid(TextureFormat::Enum _format, bool _srgb = false, GLsizei _dim = 16)
+	static bool isFramebufferFormatValid(
+		  TextureFormat::Enum _format
+		, bool _srgb = false
+		, bool _writeOnly = false
+		, GLsizei _dim = 16
+		)
 	{
 		const TextureFormatInfo& tfi = s_textureFormat[_format];
 		GLenum internalFmt = _srgb
@@ -1557,6 +1562,24 @@ namespace bgfx { namespace gl
 		||  !tfi.m_supported)
 		{
 			return false;
+		}
+
+		if (_writeOnly)
+		{
+			GLuint rbo;
+			glGenRenderbuffers(1, &rbo);
+			glBindRenderbuffer(GL_RENDERBUFFER, rbo);
+
+			glRenderbufferStorage(GL_RENDERBUFFER
+				, s_rboFormat[_format]
+				, _dim
+				, _dim
+				);
+			glBindRenderbuffer(GL_RENDERBUFFER, 0);
+			glDeleteRenderbuffers(1, &rbo);
+
+			GLenum err = glGetError();
+			return 0 == err;
 		}
 
 		GLuint fbo;
@@ -2162,6 +2185,11 @@ namespace bgfx { namespace gl
 						;
 
 					supported |= isFramebufferFormatValid(TextureFormat::Enum(ii) )
+						? BGFX_CAPS_FORMAT_TEXTURE_FRAMEBUFFER
+						: BGFX_CAPS_FORMAT_TEXTURE_NONE
+						;
+
+					supported |= isFramebufferFormatValid(TextureFormat::Enum(ii), false, true)
 						? BGFX_CAPS_FORMAT_TEXTURE_FRAMEBUFFER
 						: BGFX_CAPS_FORMAT_TEXTURE_NONE
 						;
@@ -3403,13 +3431,15 @@ namespace bgfx { namespace gl
 						GL_CHECK(glSamplerParameteri(sampler, GL_TEXTURE_MAG_FILTER, magFilter) );
 						GL_CHECK(glSamplerParameteri(sampler, GL_TEXTURE_MIN_FILTER, minFilter) );
 
-						if (BX_ENABLED(BGFX_CONFIG_RENDERER_OPENGL)
-						||  m_borderColorSupport)
+						if (BX_ENABLED(BGFX_CONFIG_RENDERER_OPENGL) )
 						{
-							if (hasBorderColor)
-							{
-								GL_CHECK(glSamplerParameterfv(sampler, GL_TEXTURE_BORDER_COLOR, _rgba) );
-							}
+							GL_CHECK(glSamplerParameterf(sampler, GL_TEXTURE_LOD_BIAS, float(BGFX_CONFIG_MIP_LOD_BIAS) ) );
+						}
+
+						if (m_borderColorSupport
+						&&  hasBorderColor)
+						{
+							GL_CHECK(glSamplerParameterfv(sampler, GL_TEXTURE_BORDER_COLOR, _rgba) );
 						}
 
 						if (0 != (_flags & (BGFX_TEXTURE_MIN_ANISOTROPIC|BGFX_TEXTURE_MAG_ANISOTROPIC) )
@@ -5377,13 +5407,15 @@ namespace bgfx { namespace gl
 			GL_CHECK(glTexParameteri(target, GL_TEXTURE_MAG_FILTER, magFilter) );
 			GL_CHECK(glTexParameteri(target, GL_TEXTURE_MIN_FILTER, minFilter) );
 
-			if (BX_ENABLED(BGFX_CONFIG_RENDERER_OPENGL)
-			||  s_renderGL->m_borderColorSupport)
+			if (BX_ENABLED(BGFX_CONFIG_RENDERER_OPENGL) )
 			{
-				if (hasBorderColor)
-				{
-					GL_CHECK(glTexParameterfv(target, GL_TEXTURE_BORDER_COLOR, _rgba) );
-				}
+				GL_CHECK(glTexParameterf(target, GL_TEXTURE_LOD_BIAS, float(BGFX_CONFIG_MIP_LOD_BIAS) ) );
+			}
+
+			if (s_renderGL->m_borderColorSupport
+			&&  hasBorderColor)
+			{
+				GL_CHECK(glTexParameterfv(target, GL_TEXTURE_BORDER_COLOR, _rgba) );
 			}
 
 			if (0 != (flags & (BGFX_TEXTURE_MIN_ANISOTROPIC|BGFX_TEXTURE_MAG_ANISOTROPIC) )
@@ -5749,8 +5781,8 @@ namespace bgfx { namespace gl
 					const bool usesTextureMS    = !!bx::findIdentifierMatch(code, s_ARB_texture_multisample);
 					const bool usesPacking      = !!bx::findIdentifierMatch(code, s_ARB_shading_language_packing);
 
-					uint32_t version =
-						  usesTextureArray || usesTexture3D || usesIUsamplers|| usesTexelFetch || usesGpuShader5 ? 130
+					uint32_t version = BX_ENABLED(BX_PLATFORM_OSX) ? 120
+						: usesTextureArray || usesTexture3D || usesIUsamplers|| usesTexelFetch || usesGpuShader5 ? 130
 						: usesTextureLod ? 120
 						: 120
 						;
@@ -5795,18 +5827,30 @@ namespace bgfx { namespace gl
 
 					if (usesTextureArray)
 					{
-						writeString(&writer
-							, "#extension GL_EXT_texture_array : enable\n"
-							  "#define texture2DArrayLodEXT texture2DArrayLod\n"
-							);
+						writeString(&writer, "#extension GL_EXT_texture_array : enable\n");
+
+						if (BX_ENABLED(BX_PLATFORM_OSX) )
+						{
+							writeString(&writer, "#define texture2DArrayLodEXT texture2DArray\n");
+						}
+						else
+						{
+							writeString(&writer, "#define texture2DArrayLodEXT texture2DArrayLod\n");
+						}
 					}
 
 					if (usesTexture3D)
 					{
-						writeString(&writer
-							, "#define texture3DEXT    texture3D\n"
-							  "#define texture3DLodEXT texture3DLod\n"
-							);
+						writeString(&writer, "#define texture3DEXT texture3D\n");
+
+						if (BX_ENABLED(BX_PLATFORM_OSX) )
+						{
+							writeString(&writer, "#define texture3DLodEXT texture3D\n");
+						}
+						else
+						{
+							writeString(&writer, "#define texture3DLodEXT texture3DLod\n");
+						}
 					}
 
 					if (130 <= version)
