@@ -723,13 +723,16 @@ namespace bgfx
 		uint8_t  flags;        //!< Status flags.
 	};
 
+	/// View stats.
+	///
+	/// @attention C99 equivalent is `bgfx_view_stats_t`.
 	///
 	struct ViewStats
 	{
-		char     name[256];      //!<
-		uint8_t  view;           //!<
-		uint64_t cpuTimeElapsed; //!<
-		uint64_t gpuTimeElapsed; //!<
+		char     name[256];      //!< View name.
+		uint8_t  view;           //!< View id.
+		uint64_t cpuTimeElapsed; //!< CPU (submit) time elapsed.
+		uint64_t gpuTimeElapsed; //!< GPU time elapsed.
 	};
 
 	/// Renderer statistics data.
@@ -759,8 +762,8 @@ namespace bgfx
 		uint16_t textWidth;       //!< Debug text width in characters.
 		uint16_t textHeight;      //!< Debug text height in characters.
 
-		uint16_t  numViews;       //!<
-		ViewStats viewStats[256]; //!<
+		uint16_t  numViews;       //!< Number of view stats.
+		ViewStats viewStats[256]; //!< View stats.
 	};
 
 	/// Vertex declaration.
@@ -1146,6 +1149,7 @@ namespace bgfx
 	///   - `BGFX_DEBUG_IFH` - Infinitely fast hardware. When this flag is set
 	///     all rendering calls will be skipped. It's useful when profiling
 	///     to quickly assess bottleneck between CPU and GPU.
+	///   - `BGFX_DEBUG_PROFILER` - Enabled profiler.
 	///   - `BGFX_DEBUG_STATS` - Display internal statistics.
 	///   - `BGFX_DEBUG_TEXT` - Display debug text.
 	///   - `BGFX_DEBUG_WIREFRAME` - Wireframe rendering. All rendering
