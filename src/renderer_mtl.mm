@@ -432,6 +432,7 @@ namespace bgfx { namespace mtl
 				return false;
 			}
 
+			retain(m_device);
 			m_metalLayer.device      = m_device;
 			m_metalLayer.pixelFormat = MTLPixelFormatBGRA8Unorm;
 
@@ -488,6 +489,7 @@ namespace bgfx { namespace mtl
 			}
 
 			m_screenshotBlitProgram.create(&m_screenshotBlitProgramVsh, &m_screenshotBlitProgramFsh);
+			release(lib);
 
 			reset(m_renderPipelineDescriptor);
 			m_renderPipelineDescriptor.colorAttachments[0].pixelFormat = m_metalLayer.pixelFormat;
@@ -672,6 +674,11 @@ namespace bgfx { namespace mtl
 				m_textures[ii].destroy();
 			}
 
+			m_screenshotBlitProgramVsh.destroy();
+			m_screenshotBlitProgramFsh.destroy();
+			m_screenshotBlitProgram.destroy();
+			MTL_RELEASE(m_screenshotBlitRenderPipelineState);
+
 			captureFinish();
 
 			MTL_RELEASE(m_depthStencilDescriptor);
@@ -683,10 +690,7 @@ namespace bgfx { namespace mtl
 			MTL_RELEASE(m_samplerDescriptor);
 
 			MTL_RELEASE(m_backBufferDepth);
-			if (BX_ENABLED(BX_PLATFORM_IOS) )
-			{
-				MTL_RELEASE(m_backBufferStencil);
-			}
+			MTL_RELEASE(m_backBufferStencil);
 
 			for (uint8_t i=0; i < MTL_MAX_FRAMES_IN_FLIGHT; ++i)
 			{
@@ -989,6 +993,24 @@ namespace bgfx { namespace mtl
 			m_occlusionQuery.invalidate(_handle);
 		}
 
+		virtual void setName(Handle _handle, const char* _name) override
+		{
+			switch (_handle.type)
+			{
+			case Handle::Shader:
+//				m_shaders[_handle.idx].m_function.m_obj.label = [NSString stringWithUTF8String:_name];
+				break;
+
+			case Handle::Texture:
+				m_textures[_handle.idx].m_ptr.m_obj.label = [NSString stringWithUTF8String:_name];
+				break;
+
+			default:
+				BX_CHECK(false, "Invalid handle type?! %d", _handle.type);
+				break;
+			}
+		}
+
 		void submitBlit(BlitState& _bs, uint16_t _view);
 
 		void submit(Frame* _render, ClearQuad& _clearQuad, TextVideoMemBlitter& _textVideoMemBlitter) override;
@@ -1165,11 +1187,18 @@ namespace bgfx { namespace mtl
 				{
 					release(m_backBufferDepth);
 				}
+
 				m_backBufferDepth   = m_device.newTextureWithDescriptor(m_textureDescriptor);
+
+				if (NULL != m_backBufferStencil)
+				{
+					release(m_backBufferStencil);
+				}
 
 				if (m_hasPixelFormatDepth32Float_Stencil8)
 				{
 					m_backBufferStencil = m_backBufferDepth;
+					retain(m_backBufferStencil);
 				}
 				else
 				{
@@ -1910,6 +1939,7 @@ namespace bgfx { namespace mtl
 		if (NULL != lib)
 		{
 			m_function = lib.newFunctionWithName(SHADER_FUNCTION_NAME);
+			release(lib);
 		}
 
 		BGFX_FATAL(NULL != m_function
@@ -2473,21 +2503,21 @@ namespace bgfx { namespace mtl
 			const bool writeOnly    = 0 != (_flags&BGFX_TEXTURE_RT_WRITE_ONLY);
 			const bool computeWrite = 0 != (_flags&BGFX_TEXTURE_COMPUTE_WRITE);
 			const bool renderTarget = 0 != (_flags&BGFX_TEXTURE_RT_MASK);
-			const bool srgb			= 0 != (_flags&BGFX_TEXTURE_SRGB) || imageContainer.m_srgb;
+			const bool srgb         = 0 != (_flags&BGFX_TEXTURE_SRGB);
 
 			BX_TRACE("Texture %3d: %s (requested: %s), layers %d, %dx%d%s RT[%c], WO[%c], CW[%c], sRGB[%c]"
-					 , this - s_renderMtl->m_textures
-					 , getName( (TextureFormat::Enum)m_textureFormat)
-					 , getName( (TextureFormat::Enum)m_requestedFormat)
-					 , numLayers
-					 , textureWidth
-					 , textureHeight
-					 , imageContainer.m_cubeMap ? "x6" : ""
-					 , renderTarget ? 'x' : '.'
-					 , writeOnly ? 'x' : '.'
-					 , computeWrite ? 'x' : '.'
-					 , srgb ? 'x' : '.'
-					 );
+					, this - s_renderMtl->m_textures
+					, getName( (TextureFormat::Enum)m_textureFormat)
+					, getName( (TextureFormat::Enum)m_requestedFormat)
+					, numLayers
+					, textureWidth
+					, textureHeight
+					, imageContainer.m_cubeMap ? "x6" : ""
+					, renderTarget ? 'x' : '.'
+					, writeOnly ? 'x' : '.'
+					, computeWrite ? 'x' : '.'
+					, srgb ? 'x' : '.'
+					);
 
 			const uint32_t msaaQuality = bx::uint32_satsub( (_flags&BGFX_TEXTURE_RT_MSAA_MASK)>>BGFX_TEXTURE_RT_MSAA_SHIFT, 1);
 			int sampleCount = s_msaa[msaaQuality];
@@ -2826,6 +2856,7 @@ namespace bgfx { namespace mtl
 
 	void CommandQueueMtl::shutdown()
 	{
+		finish(true);
 		MTL_RELEASE(m_commandQueue);
 	}
 

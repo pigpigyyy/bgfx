@@ -1552,6 +1552,15 @@ namespace bgfx
 		, uint16_t _max = 0
 		);
 
+	/// Set shader debug name.
+	///
+	/// @param[in] _handle Shader handle.
+	/// @param[in] _name Shader name.
+	///
+	/// @attention C99 equivalent is `bgfx_set_shader_name`.
+	///
+	void setName(ShaderHandle _handle, const char* _name);
+
 	/// Destroy shader. Once program is created with shader it is safe to
 	/// destroy shader.
 	///
@@ -1895,6 +1904,15 @@ namespace bgfx
 	/// @attention C99 equivalent is `bgfx_read_texture`.
 	///
 	uint32_t readTexture(TextureHandle _handle, void* _data, uint8_t _mip = 0);
+
+	/// Set texture debug name.
+	///
+	/// @param[in] _handle Texture handle.
+	/// @param[in] _name Texture name.
+	///
+	/// @attention C99 equivalent is `bgfx_set_texture_name`.
+	///
+	void setName(TextureHandle _handle, const char* _name);
 
 	/// Destroy texture.
 	///
@@ -2471,6 +2489,9 @@ namespace bgfx
 	///
 	/// @param[in] _tib Transient index buffer.
 	///
+	/// @remarks
+	///   _tib pointer after this call is invalid.
+	///
 	/// @attention C99 equivalent is `bgfx_set_transient_index_buffer`.
 	///
 	void setIndexBuffer(const TransientIndexBuffer* _tib);
@@ -2480,6 +2501,9 @@ namespace bgfx
 	/// @param[in] _tib Transient index buffer.
 	/// @param[in] _firstIndex First index to render.
 	/// @param[in] _numIndices Number of indices to render.
+	///
+	/// @remarks
+	///   _tib pointer after this call is invalid.
 	///
 	/// @attention C99 equivalent is `bgfx_set_transient_index_buffer`.
 	///
@@ -2550,6 +2574,9 @@ namespace bgfx
 	/// @param[in] _stream Vertex stream.
 	/// @param[in] _tvb Transient vertex buffer.
 	///
+	/// @remarks
+	///   _tvb pointer after this call is invalid.
+	///
 	/// @attention C99 equivalent is `bgfx_set_transient_vertex_buffer`.
 	///
 	void setVertexBuffer(
@@ -2564,6 +2591,9 @@ namespace bgfx
 	/// @param[in] _startVertex First vertex to render.
 	/// @param[in] _numVertices Number of vertices to render.
 	///
+	/// @remarks
+	///   _tvb pointer after this call is invalid.
+	///
 	/// @attention C99 equivalent is `bgfx_set_transient_vertex_buffer`.
 	///
 	void setVertexBuffer(
@@ -2575,23 +2605,37 @@ namespace bgfx
 
 	/// Set instance data buffer for draw primitive.
 	///
+	/// @param[in] _idb Transient instance data buffer.
+	/// @param[in] _num Number of data instances.
+	///
+	/// @remarks
+	///   _idb pointer after this call is invalid.
+	///
 	/// @attention C99 equivalent is `bgfx_set_instance_data_buffer`.
 	///
 	void setInstanceDataBuffer(const InstanceDataBuffer* _idb, uint32_t _num = UINT32_MAX);
 
 	/// Set instance data buffer for draw primitive.
 	///
+	/// @param[in] _handle Vertex buffer.
+	/// @param[in] _start First instance data.
+	/// @param[in] _num Number of data instances.
+	///
 	/// @attention C99 equivalent is `bgfx_set_instance_data_from_vertex_buffer`.
 	///
-	void setInstanceDataBuffer(VertexBufferHandle _handle, uint32_t _startVertex, uint32_t _num);
+	void setInstanceDataBuffer(VertexBufferHandle _handle, uint32_t _start, uint32_t _num);
 
 	/// Set instance data buffer for draw primitive.
+	///
+	/// @param[in] _handle Vertex buffer.
+	/// @param[in] _start First instance data.
+	/// @param[in] _num Number of data instances.
 	///
 	/// @attention C99 equivalent is `bgfx_set_instance_data_from_dynamic_vertex_buffer`.
 	///
 	void setInstanceDataBuffer(
 		  DynamicVertexBufferHandle _handle
-		, uint32_t _startVertex
+		, uint32_t _start
 		, uint32_t _num
 		);
 

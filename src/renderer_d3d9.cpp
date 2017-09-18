@@ -1292,6 +1292,11 @@ namespace bgfx { namespace d3d9
 			m_occlusionQuery.invalidate(_handle);
 		}
 
+		virtual void setName(Handle _handle, const char* _name) override
+		{
+			BX_UNUSED(_handle, _name)
+		}
+
 		void submitBlit(BlitState& _bs, uint16_t _view);
 
 		void submit(Frame* _render, ClearQuad& _clearQuad, TextVideoMemBlitter& _textVideoMemBlitter) override;
@@ -2272,15 +2277,15 @@ namespace bgfx { namespace d3d9
 	{
 		m_size    = _size;
 		m_flags   = _flags;
-		m_dynamic = NULL == _data;
 
 		uint32_t usage = D3DUSAGE_WRITEONLY;
 		D3DPOOL  pool  = s_renderD3D9->m_pool;
 
-		if (m_dynamic)
+		if (NULL == _data)
 		{
 			usage |= D3DUSAGE_DYNAMIC;
 			pool = D3DPOOL_DEFAULT;
+			m_dynamic = (uint8_t*)BX_ALLOC(g_allocator, _size);
 		}
 
 		const D3DFORMAT format = 0 == (_flags & BGFX_BUFFER_INDEX32)
@@ -2304,7 +2309,7 @@ namespace bgfx { namespace d3d9
 
 	void IndexBufferD3D9::preReset()
 	{
-		if (m_dynamic)
+		if (NULL != m_dynamic)
 		{
 			DX_RELEASE(m_ptr, 0);
 		}
@@ -2312,7 +2317,7 @@ namespace bgfx { namespace d3d9
 
 	void IndexBufferD3D9::postReset()
 	{
-		if (m_dynamic)
+		if (NULL != m_dynamic)
 		{
 			const D3DFORMAT format = 0 == (m_flags & BGFX_BUFFER_INDEX32)
 				? D3DFMT_INDEX16
@@ -2326,6 +2331,8 @@ namespace bgfx { namespace d3d9
 				, &m_ptr
 				, NULL
 				) );
+
+			update(0, m_size, m_dynamic);
 		}
 	}
 
@@ -2333,24 +2340,24 @@ namespace bgfx { namespace d3d9
 	{
 		m_size = _size;
 		m_decl = _declHandle;
-		m_dynamic = NULL == _data;
 
 		uint32_t usage = D3DUSAGE_WRITEONLY;
 		D3DPOOL pool = s_renderD3D9->m_pool;
 
-		if (m_dynamic)
+		if (NULL == _data)
 		{
 			usage |= D3DUSAGE_DYNAMIC;
 			pool = D3DPOOL_DEFAULT;
+			m_dynamic = (uint8_t*)BX_ALLOC(g_allocator, _size);
 		}
 
 		DX_CHECK(s_renderD3D9->m_device->CreateVertexBuffer(m_size
-				, usage
-				, 0
-				, pool
-				, &m_ptr
-				, NULL
-				) );
+			, usage
+			, 0
+			, pool
+			, &m_ptr
+			, NULL
+			) );
 
 		if (NULL != _data)
 		{
@@ -2360,7 +2367,7 @@ namespace bgfx { namespace d3d9
 
 	void VertexBufferD3D9::preReset()
 	{
-		if (m_dynamic)
+		if (NULL != m_dynamic)
 		{
 			DX_RELEASE(m_ptr, 0);
 		}
@@ -2368,15 +2375,17 @@ namespace bgfx { namespace d3d9
 
 	void VertexBufferD3D9::postReset()
 	{
-		if (m_dynamic)
+		if (NULL != m_dynamic)
 		{
 			DX_CHECK(s_renderD3D9->m_device->CreateVertexBuffer(m_size
-					, D3DUSAGE_WRITEONLY|D3DUSAGE_DYNAMIC
-					, 0
-					, D3DPOOL_DEFAULT
-					, &m_ptr
-					, NULL
-					) );
+				, D3DUSAGE_WRITEONLY|D3DUSAGE_DYNAMIC
+				, 0
+				, D3DPOOL_DEFAULT
+				, &m_ptr
+				, NULL
+				) );
+
+			update(0, m_size, m_dynamic);
 		}
 	}
 
@@ -2926,11 +2935,6 @@ namespace bgfx { namespace d3d9
 			else
 			{
 				createTexture(textureWidth, textureHeight, numMips);
-			}
-
-			if (imageContainer.m_srgb)
-			{
-				m_flags |= BGFX_TEXTURE_SRGB;
 			}
 
 			BX_TRACE("Texture %3d: %s (requested: %s), %dx%d%s%s."
