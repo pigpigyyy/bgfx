@@ -423,6 +423,53 @@ namespace bgfx
 			, va_list _argList
 			) = 0;
 
+		/// Profiler region begin.
+		///
+		/// @param[in] _name Region name, contains dynamic string.
+		/// @param[in] _abgr Color of profiler region.
+		/// @param[in] _filePath File path where profilerBegin was called.
+		/// @param[in] _line Line where profilerBegin was called.
+		///
+		/// @remarks
+		///   Not thread safe and it can be called from any thread.
+		///
+		/// @attention C99 equivalent is `bgfx_callback_vtbl.profiler_begin`.
+		///
+		virtual void profilerBegin(
+			  const char* _name
+			, uint32_t _abgr
+			, const char* _filePath
+			, uint16_t _line
+			) = 0;
+
+		/// Profiler region begin with string literal name.
+		///
+		/// @param[in] _name Region name, contains string literal.
+		/// @param[in] _abgr Color of profiler region.
+		/// @param[in] _filePath File path where profilerBeginLiteral was called.
+		/// @param[in] _line Line where profilerBeginLiteral was called.
+		///
+		/// @remarks
+		///   Not thread safe and it can be called from any thread.
+		///
+		/// @attention C99 equivalent is `bgfx_callback_vtbl.profiler_begin_literal`.
+		///
+		virtual void profilerBeginLiteral(
+			  const char* _name
+			, uint32_t _abgr
+			, const char* _filePath
+			, uint16_t _line
+			) = 0;
+
+		/// Profiler region end.
+		///
+		/// @remarks
+		///   Not thread safe and it can be called from any thread.
+		///
+		/// @attention C99 equivalent is `bgfx_callback_vtbl.profiler_end`.
+		///
+		virtual void profilerEnd() = 0;
+
 		/// Return size of for cached item. Return 0 if no cached item was
 		/// found.
 		///
@@ -741,13 +788,14 @@ namespace bgfx
 	///
 	struct Stats
 	{
-		uint64_t cpuTimeBegin;    //!< CPU frame begin time.
-		uint64_t cpuTimeEnd;      //!< CPU frame end time.
-		uint64_t cpuTimerFreq;    //!< CPU timer frequency.
+		int64_t cpuTimeFrame;    //!< CPU time between two `bgfx::frame` calls.
+		int64_t cpuTimeBegin;    //!< Render thread CPU submit begin time.
+		int64_t cpuTimeEnd;      //!< Render thread CPU submit end time.
+		int64_t cpuTimerFreq;    //!< CPU timer frequency.
 
-		uint64_t gpuTimeBegin;    //!< GPU frame begin time.
-		uint64_t gpuTimeEnd;      //!< GPU frame end time.
-		uint64_t gpuTimerFreq;    //!< GPU timer frequency.
+		int64_t gpuTimeBegin;    //!< GPU frame begin time.
+		int64_t gpuTimeEnd;      //!< GPU frame end time.
+		int64_t gpuTimerFreq;    //!< GPU timer frequency.
 
 		int64_t waitRender;       //!< Time spent waiting for render backend thread to finish issuing
 		                          //!  draw commands to underlying graphics API.
@@ -756,6 +804,9 @@ namespace bgfx
 		uint32_t numDraw;         //!< Number of draw calls submitted.
 		uint32_t numCompute;      //!< Number of compute calls submitted.
 		uint32_t maxGpuLatency;   //!< GPU driver latency.
+
+		int64_t gpuMemoryMax;     //!< Maximum available GPU memory.
+		int64_t gpuMemoryUsed;    //!< Available GPU memory.
 
 		uint16_t width;           //!< Backbuffer width in pixels.
 		uint16_t height;          //!< Backbuffer height in pixels.
@@ -1458,9 +1509,7 @@ namespace bgfx
 	/// @param[in] _num Number of indices to allocate.
 	///
 	/// @remarks
-	///   1. You must call setIndexBuffer after alloc in order to avoid memory
-	///      leak.
-	///   2. Only 16-bit index buffer is supported.
+	///   Only 16-bit index buffer is supported.
 	///
 	/// @attention C99 equivalent is `bgfx_alloc_transient_index_buffer`.
 	///
@@ -1474,13 +1523,10 @@ namespace bgfx
 	/// @param[in] _num Number of vertices to allocate.
 	/// @param[in] _decl Vertex declaration.
 	///
-	/// @remarks
-	///   You must call setVertexBuffer after alloc in order to avoid memory
-	///   leak.
-	///
 	/// @attention C99 equivalent is `bgfx_alloc_transient_vertex_buffer`.
 	///
-	void allocTransientVertexBuffer(TransientVertexBuffer* _tvb
+	void allocTransientVertexBuffer(
+		  TransientVertexBuffer* _tvb
 		, uint32_t _num
 		, const VertexDecl& _decl
 		);
@@ -1494,7 +1540,8 @@ namespace bgfx
 	///
 	/// @attention C99 equivalent is `bgfx_alloc_transient_buffers`.
 	///
-	bool allocTransientBuffers(TransientVertexBuffer* _tvb
+	bool allocTransientBuffers(
+		  TransientVertexBuffer* _tvb
 		, const VertexDecl& _decl
 		, uint32_t _numVertices
 		, TransientIndexBuffer* _tib
@@ -1503,13 +1550,19 @@ namespace bgfx
 
 	/// Allocate instance data buffer.
 	///
-	/// @remarks
-	///   You must call setInstanceDataBuffer after alloc in order to avoid
-	///   memory leak.
+	/// @param[out] _idb InstanceDataBuffer structure is filled and is valid
+	///   for duration of frame, and it can be reused for multiple draw
+	///   calls.
+	/// @param[in] _num Number of instances.
+	/// @param[in] _stride Instance stride. Must be multiple of 16.
 	///
 	/// @attention C99 equivalent is `bgfx_alloc_instance_data_buffer`.
 	///
-	const InstanceDataBuffer* allocInstanceDataBuffer(uint32_t _num, uint16_t _stride);
+	void allocInstanceDataBuffer(
+		  InstanceDataBuffer* _idb
+		, uint32_t _num
+		, uint16_t _stride
+		);
 
 	/// Create draw indirect buffer.
 	///

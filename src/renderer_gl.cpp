@@ -1043,7 +1043,7 @@ namespace bgfx { namespace gl
 		glGetError(); // ignore error if glGetString returns NULL.
 		if (NULL != str)
 		{
-			return bx::hashMurmur2A(str, (uint32_t)bx::strLen(str) );
+			return bx::hash<bx::HashMurmur2A>(str, (uint32_t)bx::strLen(str) );
 		}
 
 		return 0;
@@ -1861,7 +1861,7 @@ namespace bgfx { namespace gl
 				;
 
 			if (BX_ENABLED(BGFX_CONFIG_RENDERER_OPENGLES >= 31)
-			&&  0    == bx::strCmp(m_vendor,  "Imagination Technologies")
+			&&  0    == bx::strCmp(m_vendor, "Imagination Technologies")
 			&&  NULL != bx::strFind(m_version, "(SDK 3.5@3510720)") )
 			{
 				// Skip initializing extensions that are broken in emulator.
@@ -1870,7 +1870,7 @@ namespace bgfx { namespace gl
 			}
 
 			if (BX_ENABLED(BGFX_CONFIG_RENDERER_OPENGLES)
-			&&  0    == bx::strCmp(m_vendor,  "Imagination Technologies")
+			&&  0    == bx::strCmp(m_vendor, "Imagination Technologies")
 			&&  NULL != bx::strFind(m_version, "1.8@905891") )
 			{
 				m_workaround.m_detachShader = false;
@@ -5531,7 +5531,7 @@ namespace bgfx { namespace gl
 	void ShaderGL::create(Memory* _mem)
 	{
 		bx::MemoryReader reader(_mem->data, _mem->size);
-		m_hash = bx::hashMurmur2A(_mem->data, _mem->size);
+		m_hash = bx::hash<bx::HashMurmur2A>(_mem->data, _mem->size);
 
 		uint32_t magic;
 		bx::read(&reader, magic);
@@ -6524,7 +6524,7 @@ namespace bgfx { namespace gl
 
 		updateResolution(_render->m_resolution);
 
-		int64_t elapsed = -bx::getHPCounter();
+		int64_t timeBegin = bx::getHPCounter();
 		int64_t captureElapsed = 0;
 
 		uint32_t frameQueryIdx = UINT32_MAX;
@@ -6629,7 +6629,7 @@ namespace bgfx { namespace gl
 			uint8_t restartState = 0;
 			viewState.m_rect = _render->m_rect[0];
 
-			int32_t numItems = _render->m_num;
+			int32_t numItems = _render->m_numRenderItems;
 			for (int32_t item = 0, restartItem = numItems; item < numItems || restartItem < numItems;)
 			{
 				const uint64_t encodedKey = _render->m_sortKeys[item];
@@ -6944,7 +6944,7 @@ namespace bgfx { namespace gl
 					else
 					{
 						Rect scissorRect;
-						scissorRect.setIntersect(viewScissorRect, _render->m_rectCache.m_cache[scissor]);
+						scissorRect.setIntersect(viewScissorRect, _render->m_frameCache.m_rectCache.m_cache[scissor]);
 						if (scissorRect.isZeroArea() )
 						{
 							continue;
@@ -7600,7 +7600,7 @@ namespace bgfx { namespace gl
 				GL_CHECK(glBindVertexArray(m_vao) );
 			}
 
-			if (0 < _render->m_num)
+			if (0 < _render->m_numRenderItems)
 			{
 				if (0 != (m_resolution.m_flags & BGFX_RESET_FLUSH_AFTER_RENDER) )
 				{
@@ -7616,16 +7616,8 @@ namespace bgfx { namespace gl
 		}
 
 		m_glctx.makeCurrent(NULL);
-		int64_t now = bx::getHPCounter();
-		elapsed += now;
-
-		static int64_t last = now;
-
-		Stats& perfStats   = _render->m_perfStats;
-		perfStats.cpuTimeBegin = last;
-
-		int64_t frameTime = now - last;
-		last = now;
+		int64_t timeEnd = bx::getHPCounter();
+		int64_t frameTime = timeEnd - timeBegin;
 
 		static int64_t min = frameTime;
 		static int64_t max = frameTime;
@@ -7641,7 +7633,7 @@ namespace bgfx { namespace gl
 			m_gpuTimer.end(frameQueryIdx);
 
 			const TimerQueryGL::Result& result = m_gpuTimer.m_result[BGFX_CONFIG_MAX_VIEWS];
-			double toGpuMs = 1000.0 / 1e6;
+			double toGpuMs = 1000.0 / 1e9;
 			elapsedGpuMs   = (result.m_end - result.m_begin) * toGpuMs;
 			maxGpuElapsed  = elapsedGpuMs > maxGpuElapsed ? elapsedGpuMs : maxGpuElapsed;
 
@@ -7650,7 +7642,9 @@ namespace bgfx { namespace gl
 
 		const int64_t timerFreq = bx::getHPFrequency();
 
-		perfStats.cpuTimeEnd    = now;
+		Stats& perfStats = _render->m_perfStats;
+		perfStats.cpuTimeBegin  = timeBegin;
+		perfStats.cpuTimeEnd    = timeEnd;
 		perfStats.cpuTimerFreq  = timerFreq;
 		const TimerQueryGL::Result& result = m_gpuTimer.m_result[BGFX_CONFIG_MAX_VIEWS];
 		perfStats.gpuTimeBegin  = result.m_begin;
@@ -7659,17 +7653,19 @@ namespace bgfx { namespace gl
 		perfStats.numDraw       = statsKeyType[0];
 		perfStats.numCompute    = statsKeyType[1];
 		perfStats.maxGpuLatency = maxGpuLatency;
+		perfStats.gpuMemoryMax  = -INT64_MAX;
+		perfStats.gpuMemoryUsed = -INT64_MAX;
 
 		if (_render->m_debug & (BGFX_DEBUG_IFH|BGFX_DEBUG_STATS) )
 		{
 			m_needPresent = true;
 			TextVideoMem& tvm = m_textVideoMem;
 
-			static int64_t next = now;
+			static int64_t next = timeEnd;
 
-			if (now >= next)
+			if (timeEnd >= next)
 			{
-				next = now + timerFreq;
+				next = timeEnd + timerFreq;
 				double freq = double(timerFreq);
 				double toMs = 1000.0/freq;
 
@@ -7707,9 +7703,9 @@ namespace bgfx { namespace gl
 					, !!(m_resolution.m_flags&BGFX_RESET_MAXANISOTROPY) ? '\xfe' : ' '
 					);
 
-				double elapsedCpuMs = double(elapsed)*toMs;
+				double elapsedCpuMs = double(frameTime)*toMs;
 				tvm.printf(10, pos++, 0x8e, "    Submitted: %5d (draw %5d, compute %4d) / CPU %7.4f [ms] %c GPU %7.4f [ms] (latency %d) "
-					, _render->m_num
+					, _render->m_numRenderItems
 					, statsKeyType[0]
 					, statsKeyType[1]
 					, elapsedCpuMs

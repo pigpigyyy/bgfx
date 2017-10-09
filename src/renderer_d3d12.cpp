@@ -502,6 +502,42 @@ namespace bgfx { namespace d3d12
 	static PFN_CREATE_EVENT_EX_A CreateEventExA;
 #endif // USE_D3D12_DYNAMIC_LIB
 
+	inline D3D12_CPU_DESCRIPTOR_HANDLE getCPUHandleHeapStart(ID3D12DescriptorHeap* _heap)
+	{
+#if BX_COMPILER_MSVC
+		return _heap->GetCPUDescriptorHandleForHeapStart();
+#else
+		D3D12_CPU_DESCRIPTOR_HANDLE handle;
+		typedef void (WINAPI ID3D12DescriptorHeap::*PFN_GET_CPU_DESCRIPTOR_HANDLE_FOR_HEAP_START)(D3D12_CPU_DESCRIPTOR_HANDLE *);
+		(_heap->*(PFN_GET_CPU_DESCRIPTOR_HANDLE_FOR_HEAP_START)(&ID3D12DescriptorHeap::GetCPUDescriptorHandleForHeapStart) )(&handle);
+		return handle;
+#endif // BX_COMPILER_MSVC
+	}
+
+	inline D3D12_GPU_DESCRIPTOR_HANDLE getGPUHandleHeapStart(ID3D12DescriptorHeap* _heap)
+	{
+#if BX_COMPILER_MSVC
+		return _heap->GetGPUDescriptorHandleForHeapStart();
+#else
+		D3D12_GPU_DESCRIPTOR_HANDLE handle;
+		typedef void (WINAPI ID3D12DescriptorHeap::*PFN_GET_GPU_DESCRIPTOR_HANDLE_FOR_HEAP_START)(D3D12_GPU_DESCRIPTOR_HANDLE *);
+		(_heap->*(PFN_GET_GPU_DESCRIPTOR_HANDLE_FOR_HEAP_START)(&ID3D12DescriptorHeap::GetGPUDescriptorHandleForHeapStart) )(&handle);
+		return handle;
+#endif // BX_COMPILER_MSVC
+	}
+
+	inline D3D12_RESOURCE_DESC getResourceDesc(ID3D12Resource* _resource)
+	{
+#if BX_COMPILER_MSVC
+		return _resource->GetDesc();
+#else
+		typedef void (STDMETHODCALLTYPE ID3D12Resource::*PFN_GET_GET_DESC)(D3D12_RESOURCE_DESC*);
+		D3D12_RESOURCE_DESC desc;
+		(_resource->*(PFN_GET_GET_DESC)(&ID3D12Resource::GetDesc))(&desc);
+		return desc;
+#endif // BX_COMPILER_MSVC
+	}
+
 	struct RendererContextD3D12 : public RendererContextI
 	{
 		RendererContextD3D12()
@@ -731,7 +767,12 @@ namespace bgfx { namespace d3d12
 			if (NULL != m_factory)
 			{
 				bx::memSet(&m_adapterDesc, 0, sizeof(m_adapterDesc) );
-				luid = m_device->GetAdapterLuid();
+//	NOTICE:
+//		LUID STDMETHODCALLTYPE ID3D12Device::GetAdapterLuid() has a different behaviour in gcc ,
+//		because gcc64 returns small struct in RAX, but the microsoft implemention of ID3D12Device::GetAdapterLuid() in d3d12.dll
+//		pass the struct LUID's address as the second parameter.
+				typedef void (STDMETHODCALLTYPE ID3D12Device::*ID3D12Device_GetAdapterLuid_f)(LUID *);
+				(m_device->*(ID3D12Device_GetAdapterLuid_f)(&ID3D12Device::GetAdapterLuid))(&luid);
 #if BX_PLATFORM_WINDOWS
 				IDXGIAdapter3* adapter;
 #else
@@ -1457,7 +1498,7 @@ namespace bgfx { namespace d3d12
 		{
 			const TextureD3D12& texture = m_textures[_handle.idx];
 
-			D3D12_RESOURCE_DESC desc = texture.m_ptr->GetDesc();
+			D3D12_RESOURCE_DESC desc = getResourceDesc(texture.m_ptr);
 
 			D3D12_PLACED_SUBRESOURCE_FOOTPRINT layout;
 			uint32_t numRows;
@@ -1614,7 +1655,7 @@ namespace bgfx { namespace d3d12
 			m_cmd.finish(m_backBufferColorFence[idx]);
 			ID3D12Resource* backBuffer = m_backBufferColor[idx];
 
-			D3D12_RESOURCE_DESC desc = backBuffer->GetDesc();
+			D3D12_RESOURCE_DESC desc = getResourceDesc(backBuffer);
 
 			const uint32_t width  = (uint32_t)desc.Width;
 			const uint32_t height = (uint32_t)desc.Height;
@@ -1855,7 +1896,7 @@ namespace bgfx { namespace d3d12
 
 			for (uint32_t ii = 0, num = m_scd.BufferCount; ii < num; ++ii)
 			{
-				D3D12_CPU_DESCRIPTOR_HANDLE handle = m_rtvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
+				D3D12_CPU_DESCRIPTOR_HANDLE handle = getCPUHandleHeapStart(m_rtvDescriptorHeap);
 				handle.ptr += ii * rtvDescriptorSize;
 				DX_CHECK(m_swapChain->GetBuffer(ii
 						, IID_ID3D12Resource
@@ -1895,7 +1936,7 @@ namespace bgfx { namespace d3d12
 
 			m_device->CreateDepthStencilView(m_backBufferDepthStencil
 				, &dsvDesc
-				, m_dsvDescriptorHeap->GetCPUDescriptorHandleForHeapStart()
+				, getCPUHandleHeapStart(m_dsvDescriptorHeap)
 				);
 
 			for (uint32_t ii = 0; ii < BX_COUNTOF(m_frameBuffers); ++ii)
@@ -2106,10 +2147,10 @@ data.NumQualityLevels = 0;
 
 			if (!isValid(_fbh) )
 			{
-				m_rtvHandle = m_rtvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
+				m_rtvHandle = getCPUHandleHeapStart(m_rtvDescriptorHeap);
 				uint32_t rtvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 				m_rtvHandle.ptr += m_backBufferColorIdx * rtvDescriptorSize;
-				m_dsvHandle = m_dsvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
+				m_dsvHandle = getCPUHandleHeapStart(m_dsvDescriptorHeap);
 
 				m_currentColor        = &m_rtvHandle;
 				m_currentDepthStencil = &m_dsvHandle;
@@ -2121,7 +2162,7 @@ data.NumQualityLevels = 0;
 
 				if (0 < frameBuffer.m_num)
 				{
-					D3D12_CPU_DESCRIPTOR_HANDLE rtvDescriptor = m_rtvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
+					D3D12_CPU_DESCRIPTOR_HANDLE rtvDescriptor = getCPUHandleHeapStart(m_rtvDescriptorHeap);
 					uint32_t rtvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 					m_rtvHandle.ptr = rtvDescriptor.ptr + (BX_COUNTOF(m_backBufferColor) + _fbh.idx * BGFX_CONFIG_MAX_FRAME_BUFFER_ATTACHMENTS) * rtvDescriptorSize;
 					m_currentColor  = &m_rtvHandle;
@@ -2133,7 +2174,7 @@ data.NumQualityLevels = 0;
 
 				if (isValid(frameBuffer.m_depth) )
 				{
-					D3D12_CPU_DESCRIPTOR_HANDLE dsvDescriptor = m_dsvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
+					D3D12_CPU_DESCRIPTOR_HANDLE dsvDescriptor = getCPUHandleHeapStart(m_dsvDescriptorHeap);
 					uint32_t dsvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
 					m_dsvHandle.ptr = dsvDescriptor.ptr + (1 + _fbh.idx) * dsvDescriptorSize;
 					m_currentDepthStencil = &m_dsvHandle;
@@ -3002,7 +3043,6 @@ data.NumQualityLevels = 0;
 		m_size = _size;
 
 		ID3D12Device* device = s_renderD3D12->m_device;
-
 		m_incrementSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
 		D3D12_DESCRIPTOR_HEAP_DESC desc;
@@ -3033,8 +3073,8 @@ data.NumQualityLevels = 0;
 	void ScratchBufferD3D12::reset(D3D12_GPU_DESCRIPTOR_HANDLE& _gpuHandle)
 	{
 		m_pos = 0;
-		m_cpuHandle = m_heap->GetCPUDescriptorHandleForHeapStart();
-		m_gpuHandle = m_heap->GetGPUDescriptorHandleForHeapStart();
+		m_cpuHandle = getCPUHandleHeapStart(m_heap);
+		m_gpuHandle = getGPUHandleHeapStart(m_heap);
 		_gpuHandle = m_gpuHandle;
 	}
 
@@ -3190,8 +3230,8 @@ data.NumQualityLevels = 0;
 				, (void**)&m_heap
 				) );
 
-		m_cpuHandle = m_heap->GetCPUDescriptorHandleForHeapStart();
-		m_gpuHandle = m_heap->GetGPUDescriptorHandleForHeapStart();
+		m_cpuHandle = getCPUHandleHeapStart(m_heap);
+		m_gpuHandle = getGPUHandleHeapStart(m_heap);
 	}
 
 	void DescriptorAllocatorD3D12::destroy()
@@ -4237,7 +4277,6 @@ data.NumQualityLevels = 0;
 			resourceDesc.Layout     = D3D12_TEXTURE_LAYOUT_UNKNOWN;
 			resourceDesc.Flags      = D3D12_RESOURCE_FLAG_NONE;
 			resourceDesc.DepthOrArraySize = numSides;
-
 			D3D12_RESOURCE_STATES state = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
 
 			D3D12_CLEAR_VALUE* clearValue = NULL;
@@ -4445,7 +4484,7 @@ data.NumQualityLevels = 0;
 		const uint32_t rectpitch = _rect.m_width*bpp/8;
 		const uint32_t srcpitch  = UINT16_MAX == _pitch ? rectpitch : _pitch;
 
-		D3D12_RESOURCE_DESC desc = m_ptr->GetDesc();
+		D3D12_RESOURCE_DESC desc = getResourceDesc(m_ptr);
 
 		desc.Height = _rect.m_height;
 
@@ -4535,7 +4574,7 @@ data.NumQualityLevels = 0;
 		{
 			ID3D12Device* device = s_renderD3D12->m_device;
 
-			D3D12_CPU_DESCRIPTOR_HANDLE rtvDescriptor = s_renderD3D12->m_rtvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
+			D3D12_CPU_DESCRIPTOR_HANDLE rtvDescriptor = getCPUHandleHeapStart(s_renderD3D12->m_rtvDescriptorHeap);
 			uint32_t rtvDescriptorSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 			uint32_t fbhIdx = (uint32_t)(this - s_renderD3D12->m_frameBuffers);
 			rtvDescriptor.ptr += (BX_COUNTOF(s_renderD3D12->m_backBufferColor) + fbhIdx * BGFX_CONFIG_MAX_FRAME_BUFFER_ATTACHMENTS) * rtvDescriptorSize;
@@ -4553,7 +4592,7 @@ data.NumQualityLevels = 0;
 
 					if (0 == m_width)
 					{
-						D3D12_RESOURCE_DESC desc = texture.m_ptr->GetDesc();
+						D3D12_RESOURCE_DESC desc = getResourceDesc(texture.m_ptr);
 						m_width  = uint32_t(desc.Width);
 						m_height = uint32_t(desc.Height);
 					}
@@ -4562,7 +4601,7 @@ data.NumQualityLevels = 0;
 					{
 						BX_CHECK(!isValid(m_depth), "");
 						m_depth = handle;
-						D3D12_CPU_DESCRIPTOR_HANDLE dsvDescriptor = s_renderD3D12->m_dsvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
+						D3D12_CPU_DESCRIPTOR_HANDLE dsvDescriptor = getCPUHandleHeapStart(s_renderD3D12->m_dsvDescriptorHeap);
 						uint32_t dsvDescriptorSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
 						dsvDescriptor.ptr += (1 + fbhIdx) * dsvDescriptorSize;
 
@@ -4622,7 +4661,7 @@ data.NumQualityLevels = 0;
 		if (BGFX_CLEAR_COLOR & _clear.m_flags
 		&&  0 != m_num)
 		{
-			D3D12_CPU_DESCRIPTOR_HANDLE rtvDescriptor = s_renderD3D12->m_rtvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
+			D3D12_CPU_DESCRIPTOR_HANDLE rtvDescriptor = getCPUHandleHeapStart(s_renderD3D12->m_rtvDescriptorHeap);
 			uint32_t rtvDescriptorSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 			rtvDescriptor.ptr += (BX_COUNTOF(s_renderD3D12->m_backBufferColor) + fbhIdx * BGFX_CONFIG_MAX_FRAME_BUFFER_ATTACHMENTS) * rtvDescriptorSize;
 
@@ -4666,7 +4705,7 @@ data.NumQualityLevels = 0;
 		if (isValid(m_depth)
 		&& (BGFX_CLEAR_DEPTH|BGFX_CLEAR_STENCIL) & _clear.m_flags)
 		{
-			D3D12_CPU_DESCRIPTOR_HANDLE dsvDescriptor = s_renderD3D12->m_dsvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
+			D3D12_CPU_DESCRIPTOR_HANDLE dsvDescriptor = getCPUHandleHeapStart(s_renderD3D12->m_dsvDescriptorHeap);
 			uint32_t dsvDescriptorSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
 			dsvDescriptor.ptr += (1 + fbhIdx) * dsvDescriptorSize;
 
@@ -4702,10 +4741,10 @@ data.NumQualityLevels = 0;
 			);
 
 		DX_CHECK(s_renderD3D12->m_cmd.m_commandQueue->GetTimestampFrequency(&m_frequency) );
-		
+
 		D3D12_RANGE range = { 0, size };
 		m_readback->Map(0, &range, (void**)&m_queryResult);
-	
+
 		for (uint32_t ii = 0; ii < BX_COUNTOF(m_result); ++ii)
 		{
 			Result& result = m_result[ii];
@@ -4985,7 +5024,7 @@ data.NumQualityLevels = 0;
 			return;
 		}
 
-		int64_t elapsed = -bx::getHPCounter();
+		int64_t timeBegin = bx::getHPCounter();
 		int64_t captureElapsed = 0;
 
 		uint32_t frameQueryIdx = m_gpuTimer.begin(BGFX_CONFIG_MAX_VIEWS);
@@ -5088,7 +5127,7 @@ data.NumQualityLevels = 0;
 // 			uint8_t restartState = 0;
 			viewState.m_rect = _render->m_rect[0];
 
-			int32_t numItems = _render->m_num;
+			int32_t numItems = _render->m_numRenderItems;
 			for (int32_t item = 0, restartItem = numItems; item < numItems || restartItem < numItems;)
 			{
 				const uint64_t encodedKey = _render->m_sortKeys[item];
@@ -5186,7 +5225,7 @@ data.NumQualityLevels = 0;
 						currentBindHash = 0;
 					}
 
-					uint32_t bindHash = bx::hashMurmur2A(renderBind.m_bind, sizeof(renderBind.m_bind) );
+					uint32_t bindHash = bx::hash<bx::HashMurmur2A>(renderBind.m_bind, sizeof(renderBind.m_bind) );
 					if (currentBindHash != bindHash)
 					{
 						currentBindHash  = bindHash;
@@ -5417,7 +5456,7 @@ data.NumQualityLevels = 0;
 							);
 
 					uint16_t scissor = draw.m_scissor;
-					uint32_t bindHash = bx::hashMurmur2A(renderBind.m_bind, sizeof(renderBind.m_bind) );
+					uint32_t bindHash = bx::hash<bx::HashMurmur2A>(renderBind.m_bind, sizeof(renderBind.m_bind) );
 					if (currentBindHash != bindHash
 					||  0 != changedStencil
 					|| (hasFactor && blendFactor != draw.m_rgba)
@@ -5573,7 +5612,7 @@ data.NumQualityLevels = 0;
 						{
 							restoreScissor = true;
 							Rect scissorRect;
-							scissorRect.setIntersect(viewScissorRect,_render->m_rectCache.m_cache[scissor]);
+							scissorRect.setIntersect(viewScissorRect, _render->m_frameCache.m_rectCache.m_cache[scissor]);
 							if (scissorRect.isZeroArea() )
 							{
 								continue;
@@ -5651,7 +5690,7 @@ data.NumQualityLevels = 0;
 
 			submitBlit(bs, BGFX_CONFIG_MAX_VIEWS);
 
-			if (0 < _render->m_num)
+			if (0 < _render->m_numRenderItems)
 			{
 				if (0 != (m_resolution.m_flags & BGFX_RESET_FLUSH_AFTER_RENDER) )
 				{
@@ -5666,16 +5705,8 @@ data.NumQualityLevels = 0;
 			}
 		}
 
-		int64_t now = bx::getHPCounter();
-		elapsed += now;
-
-		static int64_t last = now;
-
-		Stats& perfStats = _render->m_perfStats;
-		perfStats.cpuTimeBegin = last;
-
-		int64_t frameTime = now - last;
-		last = now;
+		int64_t timeEnd   = bx::getHPCounter();
+		int64_t frameTime = timeEnd - timeBegin;
 
 		static int64_t min = frameTime;
 		static int64_t max = frameTime;
@@ -5707,7 +5738,9 @@ data.NumQualityLevels = 0;
 
 		const int64_t timerFreq = bx::getHPFrequency();
 
-		perfStats.cpuTimeEnd    = now;
+		Stats& perfStats = _render->m_perfStats;
+		perfStats.cpuTimeBegin  = timeBegin;
+		perfStats.cpuTimeEnd    = timeEnd;
 		perfStats.cpuTimerFreq  = timerFreq;
 		const TimerQueryD3D12::Result& result = m_gpuTimer.m_result[BGFX_CONFIG_MAX_VIEWS];
 		perfStats.gpuTimeBegin  = result.m_begin;
@@ -5716,6 +5749,17 @@ data.NumQualityLevels = 0;
 		perfStats.numDraw       = statsKeyType[0];
 		perfStats.numCompute    = statsKeyType[1];
 		perfStats.maxGpuLatency = maxGpuLatency;
+		perfStats.gpuMemoryMax  = -INT64_MAX;
+		perfStats.gpuMemoryUsed = -INT64_MAX;
+
+#if BX_PLATFORM_WINDOWS
+		DXGI_QUERY_VIDEO_MEMORY_INFO vmi[2];
+		DX_CHECK(m_adapter->QueryVideoMemoryInfo(0, DXGI_MEMORY_SEGMENT_GROUP_LOCAL,     &vmi[0]) );
+		DX_CHECK(m_adapter->QueryVideoMemoryInfo(0, DXGI_MEMORY_SEGMENT_GROUP_NON_LOCAL, &vmi[1]) );
+
+		perfStats.gpuMemoryMax  = int64_t(vmi[0].Budget);
+		perfStats.gpuMemoryUsed = int64_t(vmi[0].CurrentUsage);
+#endif // BX_PLATFORM_WINDOWS
 
 		if (_render->m_debug & (BGFX_DEBUG_IFH|BGFX_DEBUG_STATS) )
 		{
@@ -5724,12 +5768,13 @@ data.NumQualityLevels = 0;
 //			m_needPresent = true;
 			TextVideoMem& tvm = m_textVideoMem;
 
-			static int64_t next = now;
+			static int64_t next = timeEnd;
 
-			if (now >= next)
+			if (timeEnd >= next)
 			{
-				next = now + bx::getHPFrequency();
-				double freq = double(bx::getHPFrequency() );
+				next = timeEnd + timerFreq;
+
+				double freq = double(timerFreq);
 				double toMs = 1000.0 / freq;
 
 				tvm.clear();
@@ -5766,10 +5811,6 @@ data.NumQualityLevels = 0;
 					);
 
 #if BX_PLATFORM_WINDOWS
-				DXGI_QUERY_VIDEO_MEMORY_INFO vmi[2];
-				DX_CHECK(m_adapter->QueryVideoMemoryInfo(0, DXGI_MEMORY_SEGMENT_GROUP_LOCAL,     &vmi[0]) );
-				DX_CHECK(m_adapter->QueryVideoMemoryInfo(0, DXGI_MEMORY_SEGMENT_GROUP_NON_LOCAL, &vmi[1]) );
-
 				for (uint32_t ii = 0; ii < BX_COUNTOF(vmi); ++ii)
 				{
 					const DXGI_QUERY_VIDEO_MEMORY_INFO& memInfo = vmi[ii];
@@ -5821,9 +5862,9 @@ data.NumQualityLevels = 0;
 					, !!(m_resolution.m_flags&BGFX_RESET_MAXANISOTROPY) ? '\xfe' : ' '
 					);
 
-				double elapsedCpuMs = double(elapsed)*toMs;
+				double elapsedCpuMs = double(frameTime)*toMs;
 				tvm.printf(10, pos++, 0x8e, "   Submitted: %5d (draw %5d, compute %4d) / CPU %7.4f [ms] "
-					, _render->m_num
+					, _render->m_numRenderItems
 					, statsKeyType[0]
 					, statsKeyType[1]
 					, elapsedCpuMs
