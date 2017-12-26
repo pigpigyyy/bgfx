@@ -319,12 +319,12 @@ public:
 				float brushAttn = m_brush.m_size - bx::fsqrt(a2 + b2);
 
 				// Raise/Lower and scale by brush power.
-				height += 0.0f < bx::fclamp(brushAttn*m_brush.m_power, 0.0f, m_brush.m_power) && m_brush.m_raise
+				height += 0.0f < bx::clamp(brushAttn*m_brush.m_power, 0.0f, m_brush.m_power) && m_brush.m_raise
 					?  1.0f
 					: -1.0f
 					;
 
-				m_terrain.m_heightMap[heightMapPos] = (uint8_t)bx::fclamp(height, 0.0f, 255.0f);
+				m_terrain.m_heightMap[heightMapPos] = (uint8_t)bx::clamp(height, 0.0f, 255.0f);
 				m_terrain.m_dirty = true;
 			}
 		}
@@ -406,12 +406,15 @@ public:
 
 			ImGui::SetNextWindowPos(
 				  ImVec2(m_width - m_width / 5.0f - 10.0f, 10.0f)
-				, ImGuiSetCond_FirstUseEver
+				, ImGuiCond_FirstUseEver
+				);
+			ImGui::SetNextWindowSize(
+				  ImVec2(m_width / 5.0f, m_height / 3.0f)
+				, ImGuiCond_FirstUseEver
 				);
 			ImGui::Begin("Settings"
 				, NULL
-				, ImVec2(m_width / 5.0f, m_height / 3.0f)
-				, ImGuiWindowFlags_AlwaysAutoResize
+				, 0
 				);
 
 			ImGui::Separator();

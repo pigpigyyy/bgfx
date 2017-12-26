@@ -4,13 +4,19 @@
  */
 
 #include "common.h"
+
 #include <bgfx/bgfx.h>
+
 #include <bx/commandline.h>
-#include <bx/os.h>
-#include <bx/filepath.h>
-#include <bx/uint32_t.h>
-#include <bx/math.h>
 #include <bx/easing.h>
+#include <bx/file.h>
+#include <bx/filepath.h>
+#include <bx/math.h>
+#include <bx/os.h>
+#include <bx/process.h>
+#include <bx/settings.h>
+#include <bx/uint32_t.h>
+
 #include <entry/entry.h>
 #include <entry/input.h>
 #include <entry/cmd.h>
@@ -18,9 +24,6 @@
 #include <bgfx_utils.h>
 
 #include <dirent.h>
-
-#include <bx/file.h>
-#include <bx/process.h>
 
 #include <tinystl/allocator.h>
 #include <tinystl/vector.h>
@@ -40,6 +43,7 @@ namespace stl = tinystl;
 #include "fs_texture_cube.bin.h"
 #include "fs_texture_cube2.bin.h"
 #include "fs_texture_sdf.bin.h"
+#include "fs_texture_msdf.bin.h"
 #include "fs_texture_3d.bin.h"
 
 #define BACKGROUND_VIEW_ID 0
@@ -60,6 +64,7 @@ static const bgfx::EmbeddedShader s_embeddedShaders[] =
 	BGFX_EMBEDDED_SHADER(fs_texture_cube),
 	BGFX_EMBEDDED_SHADER(fs_texture_cube2),
 	BGFX_EMBEDDED_SHADER(fs_texture_sdf),
+	BGFX_EMBEDDED_SHADER(fs_texture_msdf),
 	BGFX_EMBEDDED_SHADER(fs_texture_3d),
 
 	BGFX_EMBEDDED_SHADER_END()
@@ -71,6 +76,7 @@ static const char* s_supportedExt[] =
 	"dds",
 	"exr",
 	"gif",
+	"gnf",
 	"jpg",
 	"jpeg",
 	"hdr",
@@ -227,7 +233,9 @@ struct View
 		, m_info(false)
 		, m_files(false)
 		, m_sdf(false)
+		, m_inLinear(false)
 	{
+		load();
 	}
 
 	~View()
@@ -302,7 +310,7 @@ struct View
 					float ev = m_ev;
 					bx::fromString(&ev, _argv[2]);
 
-					m_ev = bx::fclamp(ev, kEvMin, kEvMax);
+					m_ev = bx::clamp(ev, kEvMin, kEvMax);
 				}
 				else
 				{
@@ -400,7 +408,7 @@ struct View
 						m_zoom = zoom;
 					}
 
-					m_zoom = bx::fclamp(m_zoom, 0.01f, 10.0f);
+					m_zoom = bx::clamp(m_zoom, 0.01f, 10.0f);
 				}
 				else
 				{
@@ -472,7 +480,7 @@ struct View
 				{
 					float time;
 					bx::fromString(&time, _argv[2]);
-					m_transitionTime = bx::fclamp(time, 0.0f, 5.0f);
+					m_transitionTime = bx::clamp(time, 0.0f, 5.0f);
 				}
 				else
 				{
@@ -483,7 +491,7 @@ struct View
 			{
 				if (_argc >= 3)
 				{
-					m_filter = bx::toBool(_argv[2]);
+					bx::fromString(&m_filter, _argv[2]);
 				}
 				else
 				{
@@ -494,7 +502,7 @@ struct View
 			{
 				if (_argc >= 3)
 				{
-					m_fit = bx::toBool(_argv[2]);
+					bx::fromString(&m_fit, _argv[2]);
 				}
 				else
 				{
@@ -567,6 +575,10 @@ struct View
 			else if (0 == bx::strCmp(_argv[1], "help") )
 			{
 				m_help ^= true;
+			}
+			else if (0 == bx::strCmp(_argv[1], "save") )
+			{
+				save();
 			}
 			else if (0 == bx::strCmp(_argv[1], "info") )
 			{
@@ -652,6 +664,48 @@ struct View
 		}
 	}
 
+	void load()
+	{
+		bx::FilePath filePath(bx::Dir::Home);
+		filePath.join(".config/bgfx/texturev.ini");
+
+		bx::Settings settings(entry::getAllocator() );
+
+		bx::FileReader reader;
+		if (bx::open(&reader, filePath) )
+		{
+			bx::read(&reader, settings);
+			bx::close(&reader);
+
+			if (!bx::fromString(&m_transitionTime, settings.get("view/transition") ) )
+			{
+				m_transitionTime = 1.0f;
+			}
+		}
+	}
+
+	void save()
+	{
+		bx::FilePath filePath(bx::Dir::Home);
+		filePath.join(".config/bgfx/texturev.ini");
+
+		if (bx::makeAll(filePath.getPath() ) )
+		{
+			bx::Settings settings(entry::getAllocator() );
+
+			char tmp[256];
+			bx::toString(tmp, sizeof(tmp), m_transitionTime);
+			settings.set("view/transition", tmp);
+
+			bx::FileWriter writer;
+			if (bx::open(&writer, filePath) )
+			{
+				bx::write(&writer, settings);
+				bx::close(&writer);
+			}
+		}
+	}
+
 	bx::FilePath m_path;
 
 	typedef stl::vector<std::string> FileList;
@@ -684,6 +738,7 @@ struct View
 	bool     m_info;
 	bool     m_files;
 	bool     m_sdf;
+	bool     m_inLinear;
 };
 
 int cmdView(CmdContext* /*_context*/, void* _userData, int _argc, char const* const* _argv)
@@ -741,9 +796,9 @@ static uint32_t addQuad(uint16_t* _indices, uint16_t _idx0, uint16_t _idx1, uint
 
 void setGeometry(
 	  Geometry::Enum _type
-	, int32_t _x
-	, int32_t _y
-	, int32_t _width
+	, int32_t  _x
+	, int32_t  _y
+	, uint32_t _width
 	, uint32_t _height
 	, uint32_t _abgr
 	, float _maxu = 1.0f
@@ -911,7 +966,7 @@ struct InterpolatorT
 			const double freq = double(bx::getHPFrequency() );
 			int64_t now = bx::getHPCounter();
 			float time = (float)(double(now - offset) / freq);
-			float lerp = bx::fclamp(time, 0.0, duration) / duration;
+			float lerp = bx::clamp(time, 0.0f, duration) / duration;
 			return lerpT(from, to, easeT(lerp) );
 		}
 
@@ -1148,6 +1203,12 @@ int _main_(int _argc, char** _argv)
 		, true
 		);
 
+	bgfx::ProgramHandle textureMsdfProgram = bgfx::createProgram(
+		  vsTexture
+		, bgfx::createEmbeddedShader(s_embeddedShaders, type, "fs_texture_msdf")
+		, true
+		);
+
 	bgfx::ProgramHandle texture3DProgram = bgfx::createProgram(
 		  vsTexture
 		, bgfx::createEmbeddedShader(s_embeddedShaders, type, "fs_texture_3d")
@@ -1326,6 +1387,12 @@ int _main_(int _argc, char** _argv)
 						ImGui::EndMenu();
 					}
 
+					bool sdf = view.m_sdf;
+					if (ImGui::MenuItem("SDF", NULL, &sdf) )
+					{
+						cmdExec("view sdf");
+					}
+
 					bool rr = 0 != (view.m_abgr & 0x000000ff);
 					if (ImGui::MenuItem("R", NULL, &rr) )
 					{
@@ -1348,6 +1415,13 @@ int _main_(int _argc, char** _argv)
 					if (ImGui::MenuItem("Checkerboard", NULL, &alpha) )
 					{
 						cmdExec("view rgb a");
+					}
+
+					ImGui::Separator();
+
+					if (ImGui::MenuItem("Save Options") )
+					{
+						cmdExec("view save");
 					}
 
 					ImGui::EndMenu();
@@ -1387,7 +1461,12 @@ int _main_(int _argc, char** _argv)
 
 			if (view.m_info)
 			{
-				if (ImGui::Begin("Info", NULL, ImVec2(300.0f, 200.0f) ) )
+				ImGui::SetNextWindowSize(
+					  ImVec2(300.0f, 240.0f)
+					, ImGuiCond_FirstUseEver
+					);
+
+				if (ImGui::Begin("Info", NULL, ImGuiWindowFlags_AlwaysAutoResize) )
 				{
 					if (ImGui::BeginChild("##info", ImVec2(0.0f, 0.0f) ) )
 					{
@@ -1410,6 +1489,7 @@ int _main_(int _argc, char** _argv)
 							, view.m_textureInfo.numMips - 1
 							);
 
+						ImGui::Checkbox("Input linear", &view.m_inLinear);
 						ImGui::RangeSliderFloat("EV range", &view.m_evMin, &view.m_evMax, kEvMin, kEvMax);
 						ImGui::SliderFloat("EV", &view.m_ev, view.m_evMin, view.m_evMax);
 
@@ -1424,7 +1504,13 @@ int _main_(int _argc, char** _argv)
 			{
 				char temp[bx::kMaxFilePath];
 				bx::snprintf(temp, BX_COUNTOF(temp), "%s##File", view.m_path.get() );
-				if (ImGui::Begin(temp, NULL, ImVec2(400.0f, 400.0f) ) )
+
+				ImGui::SetNextWindowSize(
+					  ImVec2(400.0f, 400.0f)
+					, ImGuiCond_FirstUseEver
+					);
+
+				if (ImGui::Begin(temp, NULL) )
 				{
 					if (ImGui::BeginChild("##file_list", ImVec2(0.0f, 0.0f) ) )
 					{
@@ -1572,6 +1658,8 @@ int _main_(int _argc, char** _argv)
 					, &orientation
 					);
 
+				view.m_inLinear = bimg::isFloat(bimg::TextureFormat::Enum(view.m_textureInfo.format) );
+
 				switch (orientation)
 				{
 				default:
@@ -1700,8 +1788,8 @@ int _main_(int _argc, char** _argv)
 				result[0] = bx::fround(bx::fabs(result[0]) );
 				result[1] = bx::fround(bx::fabs(result[1]) );
 
-				scale.set(bx::fmin(float(width)  / result[0]
-					,              float(height) / result[1])
+				scale.set(bx::min(float(width)  / result[0]
+					,             float(height) / result[1])
 					, 0.1f*view.m_transitionTime
 					);
 			}
@@ -1737,7 +1825,7 @@ int _main_(int _argc, char** _argv)
 			layer.set(float(view.m_layer), 0.25f*view.m_transitionTime);
 			ev.set(view.m_ev, 0.5f*view.m_transitionTime);
 
-			float params[4] = { mip.getValue(), layer.getValue(), 0.0f, ev.getValue() };
+			float params[4] = { mip.getValue(), layer.getValue(), view.m_inLinear ? 1.0f : 0.0f, ev.getValue() };
 			if (1 < view.m_textureInfo.depth)
 			{
 				params[1] = layer.getValue()/view.m_textureInfo.depth;
@@ -1785,7 +1873,14 @@ int _main_(int _argc, char** _argv)
 			}
 			else if (view.m_sdf)
 			{
-				program = textureSdfProgram;
+				if (8 < bimg::getBitsPerPixel(bimg::TextureFormat::Enum(view.m_textureInfo.format) ) )
+				{
+					program = textureMsdfProgram;
+				}
+				else
+				{
+					program = textureSdfProgram;
+				}
 			}
 
 			bgfx::submit(IMAGE_VIEW_ID, program);

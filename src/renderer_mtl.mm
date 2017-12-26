@@ -358,8 +358,9 @@ namespace bgfx { namespace mtl
 		{
 		}
 
-		bool init()
+		bool init(const Init& _init)
 		{
+			BX_UNUSED(_init);
 			BX_TRACE("Init.");
 
 			m_fbh.idx = kInvalidHandle;
@@ -783,9 +784,10 @@ namespace bgfx { namespace mtl
 			m_program[_handle.idx].destroy();
 		}
 
-		void createTexture(TextureHandle _handle, Memory* _mem, uint32_t _flags, uint8_t _skip) override
+		void* createTexture(TextureHandle _handle, Memory* _mem, uint32_t _flags, uint8_t _skip) override
 		{
 			m_textures[_handle.idx].create(_mem, _flags, _skip);
+			return NULL;
 		}
 
 		void updateTextureBegin(TextureHandle /*_handle*/, uint8_t /*_side*/, uint8_t /*_mip*/) override
@@ -955,14 +957,15 @@ namespace bgfx { namespace mtl
 			m_commandBuffer = m_cmd.alloc();
 		}
 
-		void updateViewName(uint8_t _id, const char* _name) override
+		void updateViewName(ViewId _id, const char* _name) override
 		{
 			if (BX_ENABLED(BGFX_CONFIG_DEBUG_PIX) )
 			{
-				bx::strCopy(&s_viewName[_id][BGFX_CONFIG_MAX_VIEW_NAME_RESERVED]
-						, BX_COUNTOF(s_viewName[0])-BGFX_CONFIG_MAX_VIEW_NAME_RESERVED
-						, _name
-						);
+				bx::strCopy(
+					  &s_viewName[_id][BGFX_CONFIG_MAX_VIEW_NAME_RESERVED]
+					, BX_COUNTOF(s_viewName[0])-BGFX_CONFIG_MAX_VIEW_NAME_RESERVED
+					, _name
+					);
 			}
 		}
 
@@ -1845,10 +1848,10 @@ namespace bgfx { namespace mtl
 
 	static RendererContextMtl* s_renderMtl;
 
-	RendererContextI* rendererCreate()
+	RendererContextI* rendererCreate(const Init& _init)
 	{
 		s_renderMtl = BX_NEW(g_allocator, RendererContextMtl);
-		if (!s_renderMtl->init() )
+		if (!s_renderMtl->init(_init) )
 		{
 			BX_DELETE(g_allocator, s_renderMtl);
 			s_renderMtl = NULL;
@@ -2558,8 +2561,8 @@ namespace bgfx { namespace mtl
 					|| bimg::isDepth(bimg::TextureFormat::Enum(m_textureFormat) )
 					? 2 /*MTLStorageModePrivate*/
 					: (BX_ENABLED(BX_PLATFORM_IOS)
-						? 0 /* MTLStorageModeShared */
-						:  1 /*MTLStorageModeManaged*/
+						? 0 /* MTLStorageModeShared  */
+						: 1 /* MTLStorageModeManaged */
 					) );
 
 				desc.usage = MTLTextureUsageShaderRead;
@@ -4059,8 +4062,9 @@ namespace bgfx { namespace mtl
 
 namespace bgfx { namespace mtl
 	{
-		RendererContextI* rendererCreate()
+		RendererContextI* rendererCreate(const Init& _init)
 		{
+			BX_UNUSED(_init);
 			return NULL;
 		}
 

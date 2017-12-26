@@ -8,9 +8,9 @@
 
 namespace bgfx { namespace glsl
 {
-	static bool compile(const bx::CommandLine& _cmdLine, uint32_t _version, const std::string& _code, bx::WriterI* _writer)
+	static bool compile(const Options& _options, uint32_t _version, const std::string& _code, bx::WriterI* _writer)
 	{
-		char ch = char(tolower(_cmdLine.findOption('\0', "type")[0]) );
+		char ch = _options.shaderType;
 		const glslopt_shader_type type = ch == 'f'
 			? kGlslOptShaderFragment
 			: (ch == 'c' ? kGlslOptShaderCompute : kGlslOptShaderVertex);
@@ -113,7 +113,7 @@ namespace bgfx { namespace glsl
 				if (NULL != eol)
 				{
 					const char* qualifier = parse;
-					parse = bx::strws(bx::strword(parse) );
+					parse = bx::strws(bx::strSkipWord(parse) );
 
 					if (0 == bx::strCmp(qualifier, "attribute", 9)
 					||  0 == bx::strCmp(qualifier, "varying",   7)
@@ -148,13 +148,13 @@ namespace bgfx { namespace glsl
 					||  0 == bx::strCmp(typen, "highp", 5) )
 					{
 						precision = typen;
-						typen = parse = bx::strws(bx::strword(parse) );
+						typen = parse = bx::strws(bx::strSkipWord(parse) );
 					}
 
 					BX_UNUSED(precision);
 
 					char uniformType[256];
-					parse = bx::strword(parse);
+					parse = bx::strSkipWord(parse);
 
 					if (0 == bx::strCmp(typen, "sampler", 7) )
 					{
@@ -222,7 +222,7 @@ namespace bgfx { namespace glsl
 					const char* typen = parse;
 
 					char uniformType[256];
-					parse = bx::strword(parse);
+					parse = bx::strSkipWord(parse);
 					bx::strCopy(uniformType, int32_t(parse-typen+1), typen);
 					const char* name = parse = bx::strws(parse);
 
@@ -292,10 +292,9 @@ namespace bgfx { namespace glsl
 		uint8_t nul = 0;
 		bx::write(_writer, nul);
 
-		if (_cmdLine.hasArg('\0', "disasm") )
+		if (_options.disasm )
 		{
-			std::string disasmfp = _cmdLine.findOption('o');
-			disasmfp += ".disasm";
+			std::string disasmfp = _options.outputFilePath + ".disasm";
 			writeFile(disasmfp.c_str(), optimizedShader, shaderSize);
 		}
 
@@ -306,9 +305,9 @@ namespace bgfx { namespace glsl
 
 } // namespace glsl
 
-	bool compileGLSLShader(const bx::CommandLine& _cmdLine, uint32_t _version, const std::string& _code, bx::WriterI* _writer)
+	bool compileGLSLShader(const Options& _options, uint32_t _version, const std::string& _code, bx::WriterI* _writer)
 	{
-		return glsl::compile(_cmdLine, _version, _code, _writer);
+		return glsl::compile(_options, _version, _code, _writer);
 	}
 
 } // namespace bgfx
