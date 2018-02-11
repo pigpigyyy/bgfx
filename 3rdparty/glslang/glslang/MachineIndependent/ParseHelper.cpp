@@ -776,7 +776,7 @@ TFunction* TParseContext::handleFunctionDeclarator(const TSourceLoc& loc, TFunct
         if (prevDec->isPrototyped() && prototype)
             profileRequires(loc, EEsProfile, 300, nullptr, "multiple prototypes for same function");
         if (prevDec->getType() != function.getType())
-            error(loc, "overloaded functions must have the same return type", function.getType().getBasicTypeString().c_str(), "");
+            error(loc, "overloaded functions must have the same return type", function.getName().c_str(), "");
         for (int i = 0; i < prevDec->getParamCount(); ++i) {
             if ((*prevDec)[i].type->getQualifier().storage != function[i].type->getQualifier().storage)
                 error(loc, "overloaded functions must have the same parameter storage qualifiers for argument", function[i].type->getStorageQualifierString(), "%d", i+1);
@@ -950,7 +950,7 @@ TIntermTyped* TParseContext::handleFunctionCall(const TSourceLoc& loc, TFunction
             if (builtIn && fnCandidate->getNumExtensions())
                 requireExtensions(loc, fnCandidate->getNumExtensions(), fnCandidate->getExtensions(), fnCandidate->getName().c_str());
 
-            if (arguments) {
+            if (arguments != nullptr) {
                 // Make sure qualifications work for these arguments.
                 TIntermAggregate* aggregate = arguments->getAsAggregate();
                 for (int i = 0; i < fnCandidate->getParamCount(); ++i) {
@@ -988,7 +988,7 @@ TIntermTyped* TParseContext::handleFunctionCall(const TSourceLoc& loc, TFunction
 
             if (builtIn && fnCandidate->getBuiltInOp() != EOpNull) {
                 // A function call mapped to a built-in operation.
-                result = handleBuiltInFunctionCall(loc, *arguments, *fnCandidate);
+                result = handleBuiltInFunctionCall(loc, arguments, *fnCandidate);
             } else {
                 // This is a function call not mapped to built-in operator.
                 // It could still be a built-in function, but only if PureOperatorBuiltins == false.
@@ -1036,20 +1036,24 @@ TIntermTyped* TParseContext::handleFunctionCall(const TSourceLoc& loc, TFunction
     return result;
 }
 
-TIntermTyped* TParseContext::handleBuiltInFunctionCall(TSourceLoc loc, TIntermNode& arguments,
+TIntermTyped* TParseContext::handleBuiltInFunctionCall(TSourceLoc loc, TIntermNode* arguments,
                                                        const TFunction& function)
 {
     checkLocation(loc, function.getBuiltInOp());
     TIntermTyped *result = intermediate.addBuiltInFunctionCall(loc, function.getBuiltInOp(),
                                                                function.getParamCount() == 1,
-                                                               &arguments, function.getType());
+                                                               arguments, function.getType());
     if (obeyPrecisionQualifiers())
         computeBuiltinPrecisions(*result, function);
 
-    if (result == nullptr)  {
-        error(arguments.getLoc(), " wrong operand type", "Internal Error",
-                                  "built in unary operator function.  Type: %s",
-                                  static_cast<TIntermTyped*>(&arguments)->getCompleteString().c_str());
+    if (result == nullptr) {
+        if (arguments == nullptr)
+            error(loc, " wrong operand type", "Internal Error",
+                                      "built in unary operator function.  Type: %s", "");
+        else
+            error(arguments->getLoc(), " wrong operand type", "Internal Error",
+                                      "built in unary operator function.  Type: %s",
+                                      static_cast<TIntermTyped*>(arguments)->getCompleteString().c_str());
     } else if (result->getAsOperator())
         builtInOpCheck(loc, function, *result->getAsOperator());
 
@@ -3103,7 +3107,7 @@ void TParseContext::arrayDimCheck(const TSourceLoc& loc, const TType* type, cons
 //
 void TParseContext::arrayDimMerge(TType& type, const TArraySizes* sizes)
 {
-    if (sizes)
+    if (sizes != nullptr)
         type.addArrayOuterSizes(*sizes);
 }
 

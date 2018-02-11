@@ -614,6 +614,7 @@ namespace bgfx
 			uint32_t maxDrawCalls;            //!< Maximum number of draw calls.
 			uint32_t maxBlits;                //!< Maximum number of blit calls.
 			uint32_t maxTextureSize;          //!< Maximum texture size.
+			uint32_t maxTextureLayers;        //!< Maximum texture layers.
 			uint32_t maxViews;                //!< Maximum number of views.
 			uint32_t maxFrameBuffers;         //!< Maximum number of frame buffer handles.
 			uint32_t maxFBAttachments;        //!< Maximum number of frame buffer attachments.
@@ -1058,9 +1059,6 @@ namespace bgfx
 		///
 		/// @param[in] _tib Transient index buffer.
 		///
-		/// @remarks
-		///   _tib pointer after this call is invalid.
-		///
 		/// @attention C99 equivalent is `bgfx_set_transient_index_buffer`.
 		///
 		void setIndexBuffer(const TransientIndexBuffer* _tib);
@@ -1070,9 +1068,6 @@ namespace bgfx
 		/// @param[in] _tib Transient index buffer.
 		/// @param[in] _firstIndex First index to render.
 		/// @param[in] _numIndices Number of indices to render.
-		///
-		/// @remarks
-		///   _tib pointer after this call is invalid.
 		///
 		/// @attention C99 equivalent is `bgfx_set_transient_index_buffer`.
 		///
@@ -1143,9 +1138,6 @@ namespace bgfx
 		/// @param[in] _stream Vertex stream.
 		/// @param[in] _tvb Transient vertex buffer.
 		///
-		/// @remarks
-		///   _tvb pointer after this call is invalid.
-		///
 		/// @attention C99 equivalent is `bgfx_set_transient_vertex_buffer`.
 		///
 		void setVertexBuffer(
@@ -1160,9 +1152,6 @@ namespace bgfx
 		/// @param[in] _startVertex First vertex to render.
 		/// @param[in] _numVertices Number of vertices to render.
 		///
-		/// @remarks
-		///   _tvb pointer after this call is invalid.
-		///
 		/// @attention C99 equivalent is `bgfx_set_transient_vertex_buffer`.
 		///
 		void setVertexBuffer(
@@ -1175,16 +1164,23 @@ namespace bgfx
 		/// Set instance data buffer for draw primitive.
 		///
 		/// @param[in] _idb Transient instance data buffer.
-		/// @param[in] _num Number of data instances.
 		///
-		/// @remarks
-		///   _idb pointer after this call is invalid.
+		/// @attention C99 equivalent is `bgfx_set_instance_data_buffer`.
+		///
+		void setInstanceDataBuffer(const InstanceDataBuffer* _idb);
+
+		/// Set instance data buffer for draw primitive.
+		///
+		/// @param[in] _idb Transient instance data buffer.
+		/// @param[in] _start First instance data.
+		/// @param[in] _num Number of data instances.
 		///
 		/// @attention C99 equivalent is `bgfx_set_instance_data_buffer`.
 		///
 		void setInstanceDataBuffer(
 			  const InstanceDataBuffer* _idb
-			, uint32_t _num = UINT32_MAX
+			, uint32_t _start
+			, uint32_t _num
 			);
 
 		/// Set instance data buffer for draw primitive.
@@ -2199,7 +2195,7 @@ namespace bgfx
 	///
 	void destroy(DynamicVertexBufferHandle _handle);
 
-	/// Returns number of available indices.
+	/// Returns number of requested or maximum available indices.
 	///
 	/// @param[in] _num Number of required indices.
 	///
@@ -2207,7 +2203,7 @@ namespace bgfx
 	///
 	uint32_t getAvailTransientIndexBuffer(uint32_t _num);
 
-	/// Returns number of available vertices.
+	/// Returns number of requested or maximum available vertices.
 	///
 	/// @param[in] _num Number of required vertices.
 	/// @param[in] _decl Vertex declaration.
@@ -2219,7 +2215,7 @@ namespace bgfx
 		, const VertexDecl& _decl
 		);
 
-	/// Returns number of available instance buffer slots.
+	/// Returns number of requested or maximum available instance buffer slots.
 	///
 	/// @param[in] _num Number of required instances.
 	/// @param[in] _stride Stride per instance.
@@ -2642,7 +2638,7 @@ namespace bgfx
 	///                  +----------+
 	///                  |-z       2|
 	///                  | ^  +y    |
-	///                  | |        |
+	///                  | |        |    Unfolded cube:
 	///                  | +---->+x |
 	///       +----------+----------+----------+----------+
 	///       |+y       1|+y       4|+y       0|+y       5|
@@ -3392,9 +3388,6 @@ namespace bgfx
 	///
 	/// @param[in] _tib Transient index buffer.
 	///
-	/// @remarks
-	///   _tib pointer after this call is invalid.
-	///
 	/// @attention C99 equivalent is `bgfx_set_transient_index_buffer`.
 	///
 	void setIndexBuffer(const TransientIndexBuffer* _tib);
@@ -3404,9 +3397,6 @@ namespace bgfx
 	/// @param[in] _tib Transient index buffer.
 	/// @param[in] _firstIndex First index to render.
 	/// @param[in] _numIndices Number of indices to render.
-	///
-	/// @remarks
-	///   _tib pointer after this call is invalid.
 	///
 	/// @attention C99 equivalent is `bgfx_set_transient_index_buffer`.
 	///
@@ -3477,9 +3467,6 @@ namespace bgfx
 	/// @param[in] _stream Vertex stream.
 	/// @param[in] _tvb Transient vertex buffer.
 	///
-	/// @remarks
-	///   _tvb pointer after this call is invalid.
-	///
 	/// @attention C99 equivalent is `bgfx_set_transient_vertex_buffer`.
 	///
 	void setVertexBuffer(
@@ -3494,9 +3481,6 @@ namespace bgfx
 	/// @param[in] _startVertex First vertex to render.
 	/// @param[in] _numVertices Number of vertices to render.
 	///
-	/// @remarks
-	///   _tvb pointer after this call is invalid.
-	///
 	/// @attention C99 equivalent is `bgfx_set_transient_vertex_buffer`.
 	///
 	void setVertexBuffer(
@@ -3509,16 +3493,23 @@ namespace bgfx
 	/// Set instance data buffer for draw primitive.
 	///
 	/// @param[in] _idb Transient instance data buffer.
-	/// @param[in] _num Number of data instances.
 	///
-	/// @remarks
-	///   _idb pointer after this call is invalid.
+	/// @attention C99 equivalent is `bgfx_set_instance_data_buffer`.
+	///
+	void setInstanceDataBuffer(const InstanceDataBuffer* _idb);
+
+	/// Set instance data buffer for draw primitive.
+	///
+	/// @param[in] _idb Transient instance data buffer.
+	/// @param[in] _start First instance data.
+	/// @param[in] _num Number of data instances.
 	///
 	/// @attention C99 equivalent is `bgfx_set_instance_data_buffer`.
 	///
 	void setInstanceDataBuffer(
 		  const InstanceDataBuffer* _idb
-		, uint32_t _num = UINT32_MAX
+		, uint32_t _start
+		, uint32_t _num
 		);
 
 	/// Set instance data buffer for draw primitive.
