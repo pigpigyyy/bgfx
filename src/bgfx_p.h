@@ -493,25 +493,27 @@ namespace bgfx
 				m_height = (uint16_t)height;
 
 				uint32_t size = m_size;
-				m_size = m_width * m_height * 2;
+				m_size = m_width * m_height;
 
-				m_mem = (uint8_t*)BX_REALLOC(g_allocator, m_mem, m_size);
+				m_mem = (MemSlot*)BX_REALLOC(g_allocator, m_mem, m_size * sizeof(MemSlot));
 
 				if (size < m_size)
 				{
-					bx::memSet(&m_mem[size], 0, m_size-size);
+					bx::memSet(&m_mem[size], 0, (m_size-size) * sizeof(MemSlot));
 				}
 			}
 		}
 
 		void clear(uint8_t _attr = 0)
 		{
-			uint8_t* mem = m_mem;
-			for (uint32_t ii = 0, num = m_size/2; ii < num; ++ii)
+			MemSlot* mem = m_mem;
+			bx::memSet(mem, 0, m_size * sizeof(MemSlot));
+			if (_attr != 0)
 			{
-				mem[0] = 0;
-				mem[1] = _attr;
-				mem += 2;
+				for (uint32_t ii = 0, num = m_size; ii < num; ++ii)
+				{
+					mem[ii].attribute = _attr;
+				}
 			}
 		}
 
@@ -529,16 +531,33 @@ namespace bgfx
 		{
 			if (_x < m_width && _y < m_height)
 			{
-				uint8_t* dst = &m_mem[(_y*m_width+_x)*2];
+				MemSlot* dst = &m_mem[_y*m_width+_x];
 				const uint8_t* src = (const uint8_t*)_data;
-				const uint32_t width  = (bx::min<uint32_t>(m_width,  _width +_x)-_x)*2;
+				const uint32_t width  =  bx::min<uint32_t>(m_width,  _width +_x)-_x;
 				const uint32_t height =  bx::min<uint32_t>(m_height, _height+_y)-_y;
-				const uint32_t dstPitch = m_width*2;
-				bx::memCopy(dst, src, width, height, _pitch, dstPitch);
+				const uint32_t dstPitch = m_width;
+
+				for (uint32_t ii = 0; ii < height; ++ii)
+				{
+					for (uint32_t jj = 0; jj < width; ++jj)
+					{
+						dst[jj].character = src[jj*2];
+						dst[jj].attribute = src[jj*2+1];
+					}
+
+					src += _pitch;
+					dst += dstPitch;
+				}
 			}
 		}
 
-		uint8_t* m_mem;
+		struct MemSlot
+		{
+			uint8_t attribute;
+			uint8_t character;
+		};
+
+		MemSlot* m_mem;
 		uint32_t m_size;
 		uint16_t m_width;
 		uint16_t m_height;
@@ -2371,8 +2390,7 @@ namespace bgfx
 				}
 			}
 
-			VertexDeclHandle invalid = BGFX_INVALID_HANDLE;
-			return invalid;
+			return BGFX_INVALID_HANDLE;
 		}
 
 		VertexDeclHandle release(VertexBufferHandle _handle)
@@ -3612,8 +3630,7 @@ namespace bgfx
 			||  !isValid(_fsh) )
 			{
 				BX_TRACE("Vertex/fragment shader is invalid (vsh %d, fsh %d).", _vsh.idx, _fsh.idx);
-				ProgramHandle invalid = BGFX_INVALID_HANDLE;
-				return invalid;
+				return BGFX_INVALID_HANDLE;
 			}
 
 			ProgramHandle handle = { m_programHashMap.find(uint32_t(_fsh.idx<<16)|_vsh.idx) };
@@ -3631,8 +3648,7 @@ namespace bgfx
 				if (vsr.m_hash != fsr.m_hash)
 				{
 					BX_TRACE("Vertex shader output doesn't match fragment shader input.");
-					ProgramHandle invalid = BGFX_INVALID_HANDLE;
-					return invalid;
+					return BGFX_INVALID_HANDLE;
 				}
 
 				handle.idx = m_programHandle.alloc();
@@ -3674,8 +3690,7 @@ namespace bgfx
 			if (!isValid(_vsh) )
 			{
 				BX_WARN(false, "Compute shader is invalid (vsh %d).", _vsh.idx);
-				ProgramHandle invalid = BGFX_INVALID_HANDLE;
-				return invalid;
+				return BGFX_INVALID_HANDLE;
 			}
 
 			ProgramHandle handle = { m_programHashMap.find(_vsh.idx) };
@@ -3746,7 +3761,7 @@ namespace bgfx
 			}
 		}
 
-		BGFX_API_FUNC(TextureHandle createTexture(const Memory* _mem, uint32_t _flags, uint8_t _skip, TextureInfo* _info, BackbufferRatio::Enum _ratio) )
+		BGFX_API_FUNC(TextureHandle createTexture(const Memory* _mem, uint32_t _flags, uint8_t _skip, TextureInfo* _info, BackbufferRatio::Enum _ratio, bool _immutable) )
 		{
 			BGFX_MUTEX_SCOPE(m_resourceApiLock);
 
@@ -3786,7 +3801,12 @@ namespace bgfx
 			if (isValid(handle) )
 			{
 				TextureRef& ref = m_textureRef[handle.idx];
-				ref.init(_ratio, _info->format, imageContainer.m_numMips, 0 != (g_caps.supported & BGFX_CAPS_TEXTURE_DIRECT_ACCESS) );
+				ref.init(_ratio
+					, _info->format
+					, imageContainer.m_numMips
+					, 0 != (g_caps.supported & BGFX_CAPS_TEXTURE_DIRECT_ACCESS)
+					, _immutable
+					);
 
 				CommandBuffer& cmdbuf = getCommandBuffer(CommandBuffer::CreateTexture);
 				cmdbuf.write(handle);
@@ -3929,6 +3949,14 @@ namespace bgfx
 		{
 			BGFX_MUTEX_SCOPE(m_resourceApiLock);
 
+			const TextureRef& textureRef = m_textureRef[_handle.idx];
+			if (textureRef.m_immutable)
+			{
+				BX_WARN(false, "Can't update immutable texture.");
+				release(_mem);
+				return;
+			}
+
 			CommandBuffer& cmdbuf = getCommandBuffer(CommandBuffer::UpdateTexture);
 			cmdbuf.write(_handle);
 			cmdbuf.write(_side);
@@ -4055,8 +4083,7 @@ namespace bgfx
 				return ref.un.m_th[attachment];
 			}
 
-			TextureHandle invalid = BGFX_INVALID_HANDLE;
-			return invalid;
+			return BGFX_INVALID_HANDLE;
 		}
 
 		BGFX_API_FUNC(void destroyFrameBuffer(FrameBufferHandle _handle) )
@@ -4552,14 +4579,21 @@ namespace bgfx
 
 		struct TextureRef
 		{
-			void init(BackbufferRatio::Enum _ratio, TextureFormat::Enum _format, uint8_t _numMips, bool _ptrPending)
+			void init(
+				  BackbufferRatio::Enum _ratio
+				, TextureFormat::Enum _format
+				, uint8_t _numMips
+				, bool _ptrPending
+				, bool _immutable
+				)
 			{
-				m_ptr      = _ptrPending ? (void*)UINTPTR_MAX : NULL;
-				m_refCount = 1;
-				m_bbRatio  = uint8_t(_ratio);
-				m_format   = uint8_t(_format);
-				m_numMips  = _numMips;
-				m_owned    = false;
+				m_ptr       = _ptrPending ? (void*)UINTPTR_MAX : NULL;
+				m_refCount  = 1;
+				m_bbRatio   = uint8_t(_ratio);
+				m_format    = uint8_t(_format);
+				m_numMips   = _numMips;
+				m_owned     = false;
+				m_immutable = _immutable;
 			}
 
 			String  m_name;
@@ -4569,6 +4603,7 @@ namespace bgfx
 			uint8_t m_format;
 			uint8_t m_numMips;
 			bool    m_owned;
+			bool    m_immutable;
 		};
 
 		struct FrameBufferRef
