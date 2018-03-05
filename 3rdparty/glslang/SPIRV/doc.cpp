@@ -849,6 +849,7 @@ const char* CapabilityString(int info)
     case 5013: return "StencilExportEXT";
 
 #ifdef AMD_EXTENSIONS
+    case 5008: return "Float16ImageAMD";
     case 5009: return "ImageGatherBiasLodAMD";
     case 5010: return "FragmentMaskAMD";
     case 5015: return "ImageReadWriteLodAMD";
@@ -1197,6 +1198,8 @@ const char* OpcodeString(int op)
     case 319: return "OpAtomicFlagClear";
     case 320: return "OpImageSparseRead";
 
+    case OpModuleProcessed: return "OpModuleProcessed";
+
     case 4421: return "OpSubgroupBallotKHR";
     case 4422: return "OpSubgroupFirstInvocationKHR";
     case 4428: return "OpSubgroupAllKHR";
@@ -1348,6 +1351,7 @@ void Parameterize()
     InstructionDesc[OpReleaseEvent].setResultAndType(false, false);
     InstructionDesc[OpGroupWaitEvents].setResultAndType(false, false);
     InstructionDesc[OpAtomicFlagClear].setResultAndType(false, false);
+    InstructionDesc[OpModuleProcessed].setResultAndType(false, false);
 
     // Specific additional context-dependent operands
 
@@ -2838,6 +2842,8 @@ void Parameterize()
     InstructionDesc[OpSubgroupReadInvocationKHR].capabilities.push_back(CapabilityGroups);
     InstructionDesc[OpSubgroupReadInvocationKHR].operands.push(OperandId, "'Value'");
     InstructionDesc[OpSubgroupReadInvocationKHR].operands.push(OperandId, "'Index'");
+
+    InstructionDesc[OpModuleProcessed].operands.push(OperandLiteralString, "'process'");
 
 #ifdef AMD_EXTENSIONS
     InstructionDesc[OpGroupIAddNonUniformAMD].capabilities.push_back(CapabilityGroups);

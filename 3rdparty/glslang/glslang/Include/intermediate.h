@@ -46,7 +46,7 @@
 #ifndef __INTERMEDIATE_H
 #define __INTERMEDIATE_H
 
-#if _MSC_VER >= 1900
+#if defined(_MSC_VER) && _MSC_VER >= 1900
     #pragma warning(disable : 4464) // relative include path contains '..'
     #pragma warning(disable : 5026) // 'glslang::TIntermUnary': move constructor was implicitly defined as deleted
 #endif
@@ -1336,9 +1336,11 @@ class TIntermSelection : public TIntermTyped {
 public:
     TIntermSelection(TIntermTyped* cond, TIntermNode* trueB, TIntermNode* falseB) :
         TIntermTyped(EbtVoid), condition(cond), trueBlock(trueB), falseBlock(falseB),
+        shortCircuit(true),
         flatten(false), dontFlatten(false) {}
     TIntermSelection(TIntermTyped* cond, TIntermNode* trueB, TIntermNode* falseB, const TType& type) :
         TIntermTyped(type), condition(cond), trueBlock(trueB), falseBlock(falseB),
+        shortCircuit(true),
         flatten(false), dontFlatten(false) {}
     virtual void traverse(TIntermTraverser*);
     virtual TIntermTyped* getCondition() const { return condition; }
@@ -1346,6 +1348,9 @@ public:
     virtual TIntermNode* getFalseBlock() const { return falseBlock; }
     virtual       TIntermSelection* getAsSelectionNode()       { return this; }
     virtual const TIntermSelection* getAsSelectionNode() const { return this; }
+
+    void setNoShortCircuit() { shortCircuit = false; }
+    bool getShortCircuit() const { return shortCircuit; }
 
     void setFlatten()     { flatten = true; }
     void setDontFlatten() { dontFlatten = true; }
@@ -1356,8 +1361,9 @@ protected:
     TIntermTyped* condition;
     TIntermNode* trueBlock;
     TIntermNode* falseBlock;
-    bool flatten;     // true if flatten requested
-    bool dontFlatten; // true if requested to not flatten
+    bool shortCircuit; // normally all if-then-else and all GLSL ?: short-circuit, but HLSL ?: does not
+    bool flatten;      // true if flatten requested
+    bool dontFlatten;  // true if requested to not flatten
 };
 
 //

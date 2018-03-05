@@ -4241,6 +4241,7 @@ namespace bgfx { namespace gl
 
 		switch (_type)
 		{
+			GLSL_TYPE(GL_BOOL);
 			GLSL_TYPE(GL_INT);
 			GLSL_TYPE(GL_INT_VEC2);
 			GLSL_TYPE(GL_INT_VEC3);
@@ -5958,9 +5959,10 @@ namespace bgfx { namespace gl
 				{
 					if (BX_ENABLED(BGFX_CONFIG_RENDERER_OPENGLES >= 30) )
 					{
-						writeString(&writer
+						writeStringf(&writer
 							, "#version 300 es\n"
-							  "precision mediump float;\n"
+							  "precision %s float;\n"
+							, m_type == GL_FRAGMENT_SHADER ? "mediump" : "highp"
 							);
 					}
 					else

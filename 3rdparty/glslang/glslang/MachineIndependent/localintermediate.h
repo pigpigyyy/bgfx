@@ -378,7 +378,7 @@ public:
             processes.addProcess("client opengl100");
 
         // target-environment processes
-        if (spvVersion.vulkan == 100)
+        if (spvVersion.vulkan > 0)
             processes.addProcess("target-env vulkan1.0");
         else if (spvVersion.vulkan > 0)
             processes.addProcess("target-env vulkanUnknown");
@@ -575,7 +575,7 @@ public:
     int checkLocationRange(int set, const TIoRange& range, const TType&, bool& typeCollision);
     int addUsedOffsets(int binding, int offset, int numOffsets);
     bool addUsedConstantId(int id);
-    int computeTypeLocationSize(const TType&) const;
+    static int computeTypeLocationSize(const TType&, EShLanguage);
 
     bool setXfbBufferStride(int buffer, unsigned stride)
     {
