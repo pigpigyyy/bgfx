@@ -353,10 +353,10 @@ struct Prop
 	RenderPass::Enum m_renderPass;
 };
 
-//A simplistic material, comprised of a colour only
+//A simplistic material, comprised of a color only
 struct Material
 {
-	float m_colour[4];
+	float m_color[4];
 };
 
 inline void setVector4(float* dest, float x, float y, float z, float w)
@@ -375,8 +375,8 @@ void createCubeMesh(Prop& prop)
 	prop.m_vertices = new PosVertex[prop.m_noofVertices];
 	prop.m_indices = new uint16_t[prop.m_noofIndices];
 
-	memcpy(prop.m_vertices, s_cubeVertices, prop.m_noofVertices * PosVertex::ms_decl.getStride());
-	memcpy(prop.m_indices, s_cubeIndices, prop.m_noofIndices * sizeof(uint16_t));
+	bx::memCopy(prop.m_vertices, s_cubeVertices, prop.m_noofVertices * PosVertex::ms_decl.getStride());
+	bx::memCopy(prop.m_indices, s_cubeIndices, prop.m_noofIndices * sizeof(uint16_t));
 
 	prop.m_vertexbufferHandle = bgfx::createVertexBuffer(
 		bgfx::makeRef(prop.m_vertices, prop.m_noofVertices * PosVertex::ms_decl.getStride()),
@@ -419,10 +419,11 @@ public:
 		// Enable debug text.
 		bgfx::setDebug(m_debug);
 
-		//create uniforms
-		u_inputRTSize   = bgfx::createUniform("u_inputRTSize", bgfx::UniformType::Vec4);
-		u_cullingConfig = bgfx::createUniform("u_cullingConfig", bgfx::UniformType::Vec4);
-		u_colour        = bgfx::createUniform("u_colour", bgfx::UniformType::Vec4);
+		// Create uniforms and samplers.
+		u_inputRTSize       = bgfx::createUniform("u_inputRTSize",       bgfx::UniformType::Vec4);
+		u_cullingConfig     = bgfx::createUniform("u_cullingConfig",     bgfx::UniformType::Vec4);
+		u_color             = bgfx::createUniform("u_color",             bgfx::UniformType::Vec4, 32);
+		s_texOcclusionDepth = bgfx::createUniform("s_texOcclusionDepth", bgfx::UniformType::Int1);
 
 		//create props
 		{
@@ -464,7 +465,7 @@ public:
 				bx::vec4MulMtx(prop.m_instances->m_bboxMax, temp, prop.m_instances->m_world);
 
 				prop.m_materialID = m_noofMaterials;
-				setVector4(m_materials[prop.m_materialID].m_colour, 0.0f, 0.6f, 0.0f, 1.0f);
+				setVector4(m_materials[prop.m_materialID].m_color, 0.0f, 0.6f, 0.0f, 1.0f);
 				m_noofMaterials++;
 
 				m_totalInstancesCount += prop.m_noofInstances;
@@ -504,7 +505,7 @@ public:
 				prop.m_materialID = m_noofMaterials;
 
 				//add a "material" for this prop
-				setVector4(m_materials[prop.m_materialID].m_colour, 0.0f, 0.0f, 1.0f, 0.0f);
+				setVector4(m_materials[prop.m_materialID].m_color, 0.0f, 0.0f, 1.0f, 0.0f);
 				m_noofMaterials++;
 
 				m_totalInstancesCount += prop.m_noofInstances;
@@ -539,7 +540,7 @@ public:
 					}
 
 					prop.m_materialID = m_noofMaterials;
-					setVector4(m_materials[prop.m_materialID].m_colour, 1.0f, 1.0f, 0.0f, 1.0f);
+					setVector4(m_materials[prop.m_materialID].m_color, 1.0f, 1.0f, 0.0f, 1.0f);
 					m_noofMaterials++;
 
 					m_totalInstancesCount += prop.m_noofInstances;
@@ -572,7 +573,7 @@ public:
 					}
 
 					prop.m_materialID = m_noofMaterials;
-					setVector4(m_materials[prop.m_materialID].m_colour, 1.0f, 0.0f, 0.0f, 1.0f);
+					setVector4(m_materials[prop.m_materialID].m_color, 1.0f, 0.0f, 0.0f, 1.0f);
 					m_noofMaterials++;
 
 					m_totalInstancesCount += prop.m_noofInstances;
@@ -628,11 +629,11 @@ public:
 
 					for (uint32_t j = 0; j < numInstances; j++)
 					{
-						memcpy(data, prop.m_instances[j].m_bboxMin, 3 * sizeof(float));
+						bx::memCopy(data, prop.m_instances[j].m_bboxMin, 3 * sizeof(float));
 						data[3] = (float)i; // store the drawcall ID here to avoid creating a separate buffer
 						data += 4;
 
-						memcpy(data, prop.m_instances[j].m_bboxMax, 3 * sizeof(float));
+						bx::memCopy(data, prop.m_instances[j].m_bboxMax, 3 * sizeof(float));
 						data += 4;
 					}
 				}
@@ -658,16 +659,16 @@ public:
 				float* instanceData = new float[sizeOfBuffer];
 
 				float* data = instanceData;
-				for (uint16_t i = 0; i < m_noofProps; i++)
+				for (uint16_t ii = 0; ii < m_noofProps; ++ii)
 				{
-					Prop& prop = m_props[i];
+					Prop& prop = m_props[ii];
 
 					const uint32_t numInstances = prop.m_noofInstances;
 
-					for (uint32_t j = 0; j < numInstances; j++)
+					for (uint32_t jj = 0; jj < numInstances; ++jj)
 					{
-						memcpy(data, prop.m_instances[j].m_world, 16 * sizeof(float));
-						data[3] = (float)i; // store the drawcall ID here to avoid creating a separate buffer
+						bx::memCopy(data, prop.m_instances[jj].m_world, 16 * sizeof(float) );
+						data[3] = float(ii); // store the drawcall ID here to avoid creating a separate buffer
 						data += 16;
 					}
 				}
@@ -685,7 +686,7 @@ public:
 			m_indirectBuffer = bgfx::createIndirectBuffer(m_noofProps);
 
 			// Create programs from shaders for occlusion pass.
-			m_programOcclusionPass    = loadProgram("vs_gdr_render_occlusion", "fs_gdr_render_occlusion");
+			m_programOcclusionPass    = loadProgram("vs_gdr_render_occlusion", NULL);
 			m_programDownscaleHiZ     = loadProgram("cs_gdr_downscale_hi_z", NULL);
 			m_programOccludeProps     = loadProgram("cs_gdr_occlude_props", NULL);
 			m_programStreamCompaction = loadProgram("cs_gdr_stream_compaction", NULL);
@@ -742,8 +743,8 @@ public:
 		{
 			Prop& prop = m_props[i];
 
-			memcpy(propVerticesData, prop.m_vertices, prop.m_noofVertices * sizeof(PosVertex));
-			memcpy(propIndicesData, prop.m_indices, prop.m_noofIndices * sizeof(uint16_t));
+			bx::memCopy(propVerticesData, prop.m_vertices, prop.m_noofVertices * sizeof(PosVertex));
+			bx::memCopy(propIndicesData, prop.m_indices, prop.m_noofIndices * sizeof(uint16_t));
 
 			propVerticesData += prop.m_noofVertices;
 			propIndicesData += prop.m_noofIndices;
@@ -772,9 +773,6 @@ public:
 			bgfx::makeRef(m_indirectBufferDataCPU, m_noofProps * 3 * sizeof(uint32_t)),
 			BGFX_BUFFER_COMPUTE_READ | BGFX_BUFFER_INDEX32
 		);
-
-		//create samplers
-		s_texOcclusionDepthIn = bgfx::createUniform("s_texOcclusionDepthIn", bgfx::UniformType::Int1);
 
 		m_timeOffset = bx::getHPCounter();
 
@@ -822,10 +820,10 @@ public:
 		bgfx::destroy(m_allPropsVertexbufferHandle);
 		bgfx::destroy(m_allPropsIndexbufferHandle);
 
-		bgfx::destroy(s_texOcclusionDepthIn);
+		bgfx::destroy(s_texOcclusionDepth);
 		bgfx::destroy(u_inputRTSize);
 		bgfx::destroy(u_cullingConfig);
-		bgfx::destroy(u_colour);
+		bgfx::destroy(u_color);
 
 		delete[] m_allPropVerticesDataCPU;
 		delete[] m_allPropIndicesDataCPU;
@@ -871,7 +869,7 @@ public:
 					for (uint32_t j = 0; j < numInstances; j++)
 					{
 						//we only need the world matrix for the occlusion pass
-						memcpy(data->m_world, prop.m_instances[j].m_world, sizeof(data->m_world));
+						bx::memCopy(data->m_world, prop.m_instances[j].m_world, sizeof(data->m_world));
 						data++;
 					}
 
@@ -898,28 +896,28 @@ public:
 		uint32_t width = m_hiZwidth;
 		uint32_t height = m_hiZheight;
 
-		for (uint8_t i = 0; i < m_noofHiZMips; i++)
+		for (uint8_t lod = 0; lod < m_noofHiZMips; ++lod)
 		{
-			float coordinateScale = i > 0 ? 2.0f : 1.0f;
+			float coordinateScale = lod > 0 ? 2.0f : 1.0f;
 
 			float inputRendertargetSize[4] = { (float)width, (float)height, coordinateScale, coordinateScale };
 			bgfx::setUniform(u_inputRTSize, inputRendertargetSize);
 
-			if (i > 0)
+			if (lod > 0)
 			{
 				// down scale mip 1 onwards
 				width /= 2;
 				height /= 2;
 
-				bgfx::setImage(0, getTexture(m_hiZBuffer, 0), i - 1, bgfx::Access::Read);
-				bgfx::setImage(1, getTexture(m_hiZBuffer, 0), i, bgfx::Access::Write);
+				bgfx::setImage(0, getTexture(m_hiZBuffer, 0), lod - 1, bgfx::Access::Read);
+				bgfx::setImage(1, getTexture(m_hiZBuffer, 0), lod,     bgfx::Access::Write);
 			}
 			else
 			{
 				// copy mip zero over to the hi Z buffer.
 				// We can't currently use blit as it requires same format and CopyResource is not exposed.
 				bgfx::setImage(0, getTexture(m_hiZDepthBuffer, 0), 0, bgfx::Access::Read);
-				bgfx::setImage(1, getTexture(m_hiZBuffer, 0), 0, bgfx::Access::Write);
+				bgfx::setImage(1, getTexture(m_hiZBuffer,      0), 0, bgfx::Access::Write);
 			}
 
 			bgfx::dispatch(RENDER_PASS_HIZ_DOWNSCALE_ID, m_programDownscaleHiZ, width/16, height/16);
@@ -930,11 +928,11 @@ public:
 	void renderOccludePropsPass()
 	{
 		// run the computer shader to determine visibility of each instance
-		bgfx::setTexture(0, s_texOcclusionDepthIn, bgfx::getTexture(m_hiZBuffer));
+		bgfx::setTexture(0, s_texOcclusionDepth, bgfx::getTexture(m_hiZBuffer, 0) );
 
-		bgfx::setBuffer(1, m_instanceBoundingBoxes, bgfx::Access::Read);
+		bgfx::setBuffer(1, m_instanceBoundingBoxes,  bgfx::Access::Read);
 		bgfx::setBuffer(2, m_drawcallInstanceCounts, bgfx::Access::ReadWrite);
-		bgfx::setBuffer(3, m_instancePredicates, bgfx::Access::Write);
+		bgfx::setBuffer(3, m_instancePredicates,     bgfx::Access::Write);
 
 		float inputRendertargetSize[4] = { (float)m_hiZwidth, (float)m_hiZheight, 1.0f/ m_hiZwidth, 1.0f/ m_hiZheight };
 		bgfx::setUniform(u_inputRTSize, inputRendertargetSize);
@@ -942,7 +940,13 @@ public:
 		// store a rounded-up, power of two instance count for the stream compaction step
 		float noofInstancesPowOf2 = bx::pow(2.0f, bx::floor(bx::log(m_totalInstancesCount) / bx::log(2.0f) ) + 1.0f);
 
-		float cullingConfig[4] = { (float)m_totalInstancesCount, noofInstancesPowOf2 , (float)m_noofHiZMips, (float)m_noofProps };
+		float cullingConfig[4] =
+		{
+			(float)m_totalInstancesCount,
+			noofInstancesPowOf2,
+			(float)m_noofHiZMips,
+			(float)m_noofProps
+		};
 		bgfx::setUniform(u_cullingConfig, cullingConfig);
 
 		//set the view/projection transforms so that the compute shader can receive the viewProjection matrix automagically
@@ -1002,8 +1006,8 @@ public:
 
 		const uint16_t instanceStride = sizeof(InstanceData);
 
-		// Set "material" data (currently a colour only)
-		bgfx::setUniform(u_colour, &m_materials[0].m_colour, m_noofMaterials);
+		// Set "material" data (currently a color only)
+		bgfx::setUniform(u_color, &m_materials[0].m_color, m_noofMaterials);
 
 		if (m_useIndirect)
 		{
@@ -1019,9 +1023,9 @@ public:
 		else
 		{
 			// render all props using regular instancing
-			for (uint16_t i = 0; i < m_noofProps; i++)
+			for (uint16_t ii = 0; ii < m_noofProps; ++ii)
 			{
-				Prop& prop = m_props[i];
+				Prop& prop = m_props[ii];
 
 				if (prop.m_renderPass & RenderPass::MainPass)
 				{
@@ -1035,12 +1039,12 @@ public:
 
 						InstanceData *data = (InstanceData *)instanceBuffer.data;
 
-						for (uint32_t j = 0; j < numInstances; j++)
+						for (uint32_t jj = 0; jj < numInstances; ++jj)
 						{
 							//copy world matrix
-							memcpy(data->m_world, prop.m_instances[j].m_world, sizeof(data->m_world));
+							bx::memCopy(data->m_world, prop.m_instances[jj].m_world, sizeof(data->m_world) );
 							//pack the material ID into the world transform
-							data->m_world[3] = prop.m_materialID;
+							data->m_world[3] = float(prop.m_materialID);
 							data++;
 						}
 
@@ -1199,10 +1203,10 @@ public:
 	bgfx::VertexBufferHandle m_instanceBuffer;
 	bgfx::DynamicVertexBufferHandle m_culledInstanceBuffer;
 
-	bgfx::UniformHandle s_texOcclusionDepthIn;
+	bgfx::UniformHandle s_texOcclusionDepth;
 	bgfx::UniformHandle u_inputRTSize;
 	bgfx::UniformHandle u_cullingConfig;
-	bgfx::UniformHandle u_colour;
+	bgfx::UniformHandle u_color;
 
 	Prop*	m_props;
 	Material* m_materials;

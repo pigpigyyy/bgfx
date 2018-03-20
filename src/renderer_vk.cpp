@@ -1951,7 +1951,7 @@ VK_IMPORT_DEVICE
 			}
 		}
 
-		void createIndexBuffer(IndexBufferHandle _handle, Memory* _mem, uint16_t _flags) override
+		void createIndexBuffer(IndexBufferHandle _handle, const Memory* _mem, uint16_t _flags) override
 		{
 			m_indexBuffers[_handle.idx].create(_mem->size, _mem->data, _flags, false);
 		}
@@ -1972,7 +1972,7 @@ VK_IMPORT_DEVICE
 		{
 		}
 
-		void createVertexBuffer(VertexBufferHandle _handle, Memory* _mem, VertexDeclHandle _declHandle, uint16_t _flags) override
+		void createVertexBuffer(VertexBufferHandle _handle, const Memory* _mem, VertexDeclHandle _declHandle, uint16_t _flags) override
 		{
 			m_vertexBuffers[_handle.idx].create(_mem->size, _mem->data, _declHandle, _flags);
 		}
@@ -1987,7 +1987,7 @@ VK_IMPORT_DEVICE
 			m_indexBuffers[_handle.idx].create(_size, NULL, _flags, false);
 		}
 
-		void updateDynamicIndexBuffer(IndexBufferHandle _handle, uint32_t _offset, uint32_t _size, Memory* _mem) override
+		void updateDynamicIndexBuffer(IndexBufferHandle _handle, uint32_t _offset, uint32_t _size, const Memory* _mem) override
 		{
 			BX_UNUSED(_handle, _offset, _size, _mem);
 //			m_indexBuffers[_handle.idx].update(m_commandBuffer, _offset, bx::uint32_min(_size, _mem->size), _mem->data);
@@ -2004,7 +2004,7 @@ VK_IMPORT_DEVICE
 			m_vertexBuffers[_handle.idx].create(_size, NULL, decl, _flags);
 		}
 
-		void updateDynamicVertexBuffer(VertexBufferHandle _handle, uint32_t _offset, uint32_t _size, Memory* _mem) override
+		void updateDynamicVertexBuffer(VertexBufferHandle _handle, uint32_t _offset, uint32_t _size, const Memory* _mem) override
 		{
 			BX_UNUSED(_handle, _offset, _size, _mem);
 //			m_vertexBuffers[_handle.idx].update(m_commandBuffer, _offset, bx::uint32_min(_size, _mem->size), _mem->data);
@@ -2015,7 +2015,7 @@ VK_IMPORT_DEVICE
 			m_vertexBuffers[_handle.idx].destroy();
 		}
 
-		void createShader(ShaderHandle _handle, Memory* _mem) override
+		void createShader(ShaderHandle _handle, const Memory* _mem) override
 		{
 			m_shaders[_handle.idx].create(_mem);
 		}
@@ -2035,7 +2035,7 @@ VK_IMPORT_DEVICE
 			m_program[_handle.idx].destroy();
 		}
 
-		void* createTexture(TextureHandle /*_handle*/, Memory* /*_mem*/, uint32_t /*_flags*/, uint8_t /*_skip*/) override
+		void* createTexture(TextureHandle /*_handle*/, const Memory* /*_mem*/, uint32_t /*_flags*/, uint8_t /*_skip*/) override
 		{
 			return NULL;
 		}
@@ -4050,7 +4050,7 @@ BX_UNUSED(currentSamplerStateIdx);
 // 						wchar_t* viewNameW = s_viewNameW[view];
 // 						viewNameW[3] = L' ';
 // 						PIX_ENDEVENT();
-// 						PIX_BEGINEVENT(D3DCOLOR_RGBA(0xff, 0x00, 0x00, 0xff), viewNameW);
+// 						PIX_BEGINEVENT(toRgba8(0xff, 0x00, 0x00, 0xff), viewNameW);
 					}
 
 					commandListChanged = true;
@@ -4410,7 +4410,7 @@ BX_UNUSED(presentMin, presentMax);
 
 		if (_render->m_debug & (BGFX_DEBUG_IFH|BGFX_DEBUG_STATS) )
 		{
-//			PIX_BEGINEVENT(D3DCOLOR_RGBA(0x40, 0x40, 0x40, 0xff), L"debugstats");
+//			PIX_BEGINEVENT(toRgba8(0x40, 0x40, 0x40, 0xff), L"debugstats");
 
 //			m_needPresent = true;
 			TextVideoMem& tvm = m_textVideoMem;
@@ -4534,7 +4534,7 @@ BX_UNUSED(presentMin, presentMax);
 
  				if (NULL != m_renderdocdll)
  				{
- 					tvm.printf(tvm.m_width-27, 0, 0x1f, " [F11 - RenderDoc capture] ");
+ 					tvm.printf(tvm.m_width-27, 0, 0x4f, " [F11 - RenderDoc capture] ");
  				}
 
 				tvm.printf(10, pos++, 0x8b, "      Indices: %7d ", statsNumIndices);
@@ -4574,7 +4574,7 @@ BX_UNUSED(presentMin, presentMax);
 		}
 		else if (_render->m_debug & BGFX_DEBUG_TEXT)
 		{
-//			PIX_BEGINEVENT(D3DCOLOR_RGBA(0x40, 0x40, 0x40, 0xff), L"debugtext");
+//			PIX_BEGINEVENT(toRgba8(0x40, 0x40, 0x40, 0xff), L"debugtext");
 
 			blit(this, _textVideoMemBlitter, _render->m_textVideoMem);
 

@@ -2660,7 +2660,7 @@ namespace bgfx { namespace gl
 			}
 		}
 
-		void createIndexBuffer(IndexBufferHandle _handle, Memory* _mem, uint16_t _flags) override
+		void createIndexBuffer(IndexBufferHandle _handle, const Memory* _mem, uint16_t _flags) override
 		{
 			m_indexBuffers[_handle.idx].create(_mem->size, _mem->data, _flags);
 		}
@@ -2681,7 +2681,7 @@ namespace bgfx { namespace gl
 		{
 		}
 
-		void createVertexBuffer(VertexBufferHandle _handle, Memory* _mem, VertexDeclHandle _declHandle, uint16_t _flags) override
+		void createVertexBuffer(VertexBufferHandle _handle, const Memory* _mem, VertexDeclHandle _declHandle, uint16_t _flags) override
 		{
 			m_vertexBuffers[_handle.idx].create(_mem->size, _mem->data, _declHandle, _flags);
 		}
@@ -2696,7 +2696,7 @@ namespace bgfx { namespace gl
 			m_indexBuffers[_handle.idx].create(_size, NULL, _flags);
 		}
 
-		void updateDynamicIndexBuffer(IndexBufferHandle _handle, uint32_t _offset, uint32_t _size, Memory* _mem) override
+		void updateDynamicIndexBuffer(IndexBufferHandle _handle, uint32_t _offset, uint32_t _size, const Memory* _mem) override
 		{
 			m_indexBuffers[_handle.idx].update(_offset, bx::uint32_min(_size, _mem->size), _mem->data);
 		}
@@ -2712,7 +2712,7 @@ namespace bgfx { namespace gl
 			m_vertexBuffers[_handle.idx].create(_size, NULL, decl, _flags);
 		}
 
-		void updateDynamicVertexBuffer(VertexBufferHandle _handle, uint32_t _offset, uint32_t _size, Memory* _mem) override
+		void updateDynamicVertexBuffer(VertexBufferHandle _handle, uint32_t _offset, uint32_t _size, const Memory* _mem) override
 		{
 			m_vertexBuffers[_handle.idx].update(_offset, bx::uint32_min(_size, _mem->size), _mem->data);
 		}
@@ -2722,7 +2722,7 @@ namespace bgfx { namespace gl
 			m_vertexBuffers[_handle.idx].destroy();
 		}
 
-		void createShader(ShaderHandle _handle, Memory* _mem) override
+		void createShader(ShaderHandle _handle, const Memory* _mem) override
 		{
 			m_shaders[_handle.idx].create(_mem);
 		}
@@ -2743,7 +2743,7 @@ namespace bgfx { namespace gl
 			m_program[_handle.idx].destroy();
 		}
 
-		void* createTexture(TextureHandle _handle, Memory* _mem, uint32_t _flags, uint8_t _skip) override
+		void* createTexture(TextureHandle _handle, const Memory* _mem, uint32_t _flags, uint8_t _skip) override
 		{
 			m_textures[_handle.idx].create(_mem, _flags, _skip);
 			return NULL;
@@ -5542,7 +5542,7 @@ namespace bgfx { namespace gl
 		bx::memCopy(_str, _insert, len);
 	}
 
-	void ShaderGL::create(Memory* _mem)
+	void ShaderGL::create(const Memory* _mem)
 	{
 		bx::MemoryReader reader(_mem->data, _mem->size);
 		m_hash = bx::hash<bx::HashMurmur2A>(_mem->data, _mem->size);
@@ -6212,17 +6212,30 @@ namespace bgfx { namespace gl
 					}
 					else
 					{
-						GLenum target = texture.isCubeMap()
-							? GL_TEXTURE_CUBE_MAP_POSITIVE_X + m_attachment[ii].layer
-							: texture.m_target
-							;
-
-						GL_CHECK(glFramebufferTexture2D(GL_FRAMEBUFFER
-							, attachment
-							, target
-							, texture.m_id
-							, m_attachment[ii].mip
+						if (1 < texture.m_depth
+						&&  !texture.isCubeMap())
+						{
+							GL_CHECK(glFramebufferTextureLayer(GL_FRAMEBUFFER
+								, attachment
+								, texture.m_id
+								, m_attachment[ii].mip
+								, m_attachment[ii].layer
 							) );
+						}
+						else
+						{
+							GLenum target = texture.isCubeMap()
+								? GL_TEXTURE_CUBE_MAP_POSITIVE_X + m_attachment[ii].layer
+								: texture.m_target
+								;
+
+							GL_CHECK(glFramebufferTexture2D(GL_FRAMEBUFFER
+								, attachment
+								, target
+								, texture.m_id
+								, m_attachment[ii].mip
+							) );
+						}
 					}
 
 					needResolve |= (0 != texture.m_rbo) && (0 != texture.m_id);
@@ -6819,16 +6832,24 @@ namespace bgfx { namespace gl
 
 								case Binding::Image:
 									{
-										const TextureGL& texture = m_textures[bind.m_idx];
-										GL_CHECK(glBindImageTexture(ii
-											, texture.m_id
-											, bind.m_un.m_compute.m_mip
-											, texture.isCubeMap() ? GL_TRUE : GL_FALSE
-											, 0
-											, s_access[bind.m_un.m_compute.m_access]
-											, s_imageFormat[bind.m_un.m_compute.m_format])
-											);
-										barrier |= GL_SHADER_IMAGE_ACCESS_BARRIER_BIT;
+										if (Access::Read == bind.m_un.m_compute.m_access)
+										{
+											TextureGL& texture = m_textures[bind.m_idx];
+											texture.commit(ii, texture.m_flags, _render->m_colorPalette);
+										}
+										else
+										{
+											const TextureGL& texture = m_textures[bind.m_idx];
+											GL_CHECK(glBindImageTexture(ii
+												, texture.m_id
+												, bind.m_un.m_compute.m_mip
+												, texture.isCubeMap() ? GL_TRUE : GL_FALSE
+												, 0
+												, s_access[bind.m_un.m_compute.m_access]
+												, s_imageFormat[bind.m_un.m_compute.m_format])
+												);
+											barrier |= GL_SHADER_IMAGE_ACCESS_BARRIER_BIT;
+										}
 									}
 									break;
 
@@ -7757,7 +7778,7 @@ namespace bgfx { namespace gl
 
 				if (NULL != m_renderdocdll)
 				{
-					tvm.printf(tvm.m_width-27, 0, 0x1f, " [F11 - RenderDoc capture] ");
+					tvm.printf(tvm.m_width-27, 0, 0x4f, " [F11 - RenderDoc capture] ");
 				}
 
 				tvm.printf(10, pos++, 0x8b, "      Indices: %7d ", statsNumIndices);

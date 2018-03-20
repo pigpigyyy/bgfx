@@ -485,7 +485,7 @@ namespace bgfx { namespace mtl
 
 			reset(m_renderPipelineDescriptor);
 			m_renderPipelineDescriptor.colorAttachments[0].pixelFormat = m_metalLayer.pixelFormat;
-			m_renderPipelineDescriptor.vertexFunction = m_screenshotBlitProgram.m_vsh->m_function;
+			m_renderPipelineDescriptor.vertexFunction   = m_screenshotBlitProgram.m_vsh->m_function;
 			m_renderPipelineDescriptor.fragmentFunction = m_screenshotBlitProgram.m_fsh->m_function;
 			m_screenshotBlitRenderPipelineState = m_device.newRenderPipelineStateWithDescriptor(m_renderPipelineDescriptor);
 
@@ -703,7 +703,7 @@ namespace bgfx { namespace mtl
 			return BGFX_RENDERER_METAL_NAME;
 		}
 
-		void createIndexBuffer(IndexBufferHandle _handle, Memory* _mem, uint16_t _flags) override
+		void createIndexBuffer(IndexBufferHandle _handle, const Memory* _mem, uint16_t _flags) override
 		{
 			m_indexBuffers[_handle.idx].create(_mem->size, _mem->data, _flags);
 		}
@@ -724,7 +724,7 @@ namespace bgfx { namespace mtl
 		{
 		}
 
-		void createVertexBuffer(VertexBufferHandle _handle, Memory* _mem, VertexDeclHandle _declHandle, uint16_t _flags) override
+		void createVertexBuffer(VertexBufferHandle _handle, const Memory* _mem, VertexDeclHandle _declHandle, uint16_t _flags) override
 		{
 			m_vertexBuffers[_handle.idx].create(_mem->size, _mem->data, _declHandle, _flags);
 		}
@@ -739,7 +739,7 @@ namespace bgfx { namespace mtl
 			m_indexBuffers[_handle.idx].create(_size, NULL, _flags);
 		}
 
-		void updateDynamicIndexBuffer(IndexBufferHandle _handle, uint32_t _offset, uint32_t _size, Memory* _mem) override
+		void updateDynamicIndexBuffer(IndexBufferHandle _handle, uint32_t _offset, uint32_t _size, const Memory* _mem) override
 		{
 			m_indexBuffers[_handle.idx].update(_offset, bx::uint32_min(_size, _mem->size), _mem->data);
 		}
@@ -755,7 +755,7 @@ namespace bgfx { namespace mtl
 			m_vertexBuffers[_handle.idx].create(_size, NULL, decl, _flags);
 		}
 
-		void updateDynamicVertexBuffer(VertexBufferHandle _handle, uint32_t _offset, uint32_t _size, Memory* _mem) override
+		void updateDynamicVertexBuffer(VertexBufferHandle _handle, uint32_t _offset, uint32_t _size, const Memory* _mem) override
 		{
 			m_vertexBuffers[_handle.idx].update(_offset, bx::uint32_min(_size, _mem->size), _mem->data);
 		}
@@ -765,7 +765,7 @@ namespace bgfx { namespace mtl
 			m_vertexBuffers[_handle.idx].destroy();
 		}
 
-		void createShader(ShaderHandle _handle, Memory* _mem) override
+		void createShader(ShaderHandle _handle, const Memory* _mem) override
 		{
 			m_shaders[_handle.idx].create(_mem);
 		}
@@ -785,7 +785,7 @@ namespace bgfx { namespace mtl
 			m_program[_handle.idx].destroy();
 		}
 
-		void* createTexture(TextureHandle _handle, Memory* _mem, uint32_t _flags, uint8_t _skip) override
+		void* createTexture(TextureHandle _handle, const Memory* _mem, uint32_t _flags, uint8_t _skip) override
 		{
 			m_textures[_handle.idx].create(_mem, _flags, _skip);
 			return NULL;
@@ -1062,7 +1062,7 @@ namespace bgfx { namespace mtl
 			RenderPipelineState pipelineState = program.getRenderPipelineState(state, 0, fbh, _blitter.m_vb->decl, 0);
 			rce.setRenderPipelineState(pipelineState);
 
-			uint32_t vertexUniformBufferSize = program.m_vshConstantBufferSize;
+			uint32_t vertexUniformBufferSize   = program.m_vshConstantBufferSize;
 			uint32_t fragmentUniformBufferSize = program.m_fshConstantBufferSize;
 
 			if (vertexUniformBufferSize )
@@ -1235,7 +1235,7 @@ namespace bgfx { namespace mtl
 					MTL_RELEASE(m_screenshotBlitRenderPipelineState)
 					reset(m_renderPipelineDescriptor);
 					m_renderPipelineDescriptor.colorAttachments[0].pixelFormat = m_metalLayer.pixelFormat;
-					m_renderPipelineDescriptor.vertexFunction = m_screenshotBlitProgram.m_vsh->m_function;
+					m_renderPipelineDescriptor.vertexFunction   = m_screenshotBlitProgram.m_vsh->m_function;
 					m_renderPipelineDescriptor.fragmentFunction = m_screenshotBlitProgram.m_fsh->m_function;
 					m_screenshotBlitRenderPipelineState = m_device.newRenderPipelineStateWithDescriptor(m_renderPipelineDescriptor);
 				}
@@ -1949,12 +1949,7 @@ namespace bgfx { namespace mtl
 	{
 		BX_CHECK(NULL != _vsh->m_function.m_obj, "Vertex shader doesn't exist.");
 		m_vsh = _vsh;
-
-		if (NULL != _fsh)
-		{
-			BX_CHECK(NULL != _fsh->m_function.m_obj, "Fragment shader doesn't exist.");
-			m_fsh = _fsh;
-		}
+		m_fsh = _fsh;
 
 		// get attributes
 		bx::memSet(m_attributes, 0xff, sizeof(m_attributes) );
@@ -2193,7 +2188,7 @@ namespace bgfx { namespace mtl
 			}
 
 			pd.vertexFunction   = m_vsh->m_function;
-			pd.fragmentFunction = m_fsh->m_function;
+			pd.fragmentFunction = m_fsh != NULL ? m_fsh->m_function : NULL;
 
 			if (isValid(_declHandle) )
 			{
@@ -3721,14 +3716,14 @@ namespace bgfx { namespace mtl
 					uint32_t vertexUniformBufferSize   = program.m_vshConstantBufferSize;
 					uint32_t fragmentUniformBufferSize = program.m_fshConstantBufferSize;
 
-					if (vertexUniformBufferSize)
+					if (0 != vertexUniformBufferSize)
 					{
 						m_uniformBufferVertexOffset = BX_ALIGN_MASK(m_uniformBufferVertexOffset, program.m_vshConstantBufferAlignmentMask);
 						rce.setVertexBuffer(m_uniformBuffer, m_uniformBufferVertexOffset, 0);
 					}
 
 					m_uniformBufferFragmentOffset = m_uniformBufferVertexOffset + vertexUniformBufferSize;
-					if (fragmentUniformBufferSize)
+					if (0 != fragmentUniformBufferSize)
 					{
 						m_uniformBufferFragmentOffset = BX_ALIGN_MASK(m_uniformBufferFragmentOffset, program.m_fshConstantBufferAlignmentMask);
 						rce.setFragmentBuffer(m_uniformBuffer, m_uniformBufferFragmentOffset, 0);

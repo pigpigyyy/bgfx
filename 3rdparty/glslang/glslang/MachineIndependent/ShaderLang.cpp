@@ -619,9 +619,9 @@ void TranslateEnvironment(const TEnvironment* environment, EShMessages& messages
 {
     // Set up environmental defaults, first ignoring 'environment'.
     if (messages & EShMsgSpvRules)
-        spvVersion.spv = 0x00010000;
+        spvVersion.spv = EShTargetSpv_1_0;
     if (messages & EShMsgVulkanRules) {
-        spvVersion.vulkan = 100;
+        spvVersion.vulkan = EShTargetVulkan_1_0;
         spvVersion.vulkanGlsl = 100;
     } else if (spvVersion.spv != 0)
         spvVersion.openGl = 100;
@@ -768,6 +768,8 @@ bool ProcessDeferred(
     SpvVersion spvVersion;
     EShLanguage stage = compiler->getLanguage();
     TranslateEnvironment(environment, messages, source, stage, spvVersion);
+    if (environment != nullptr && environment->target.hlslFunctionality1)
+        intermediate.setHlslFunctionality1();
 
     // First, without using the preprocessor or parser, find the #version, so we know what
     // symbol tables, processing rules, etc. to set up.  This does not need the extra strings
@@ -840,8 +842,13 @@ bool ProcessDeferred(
     // Add built-in symbols that are potentially context dependent;
     // they get popped again further down.
     if (! AddContextSpecificSymbols(resources, compiler->infoSink, symbolTable, version, profile, spvVersion,
-                                    stage, source))
+                                    stage, source)) {
+        delete symbolTableMemory;
+        delete [] lengths;
+        delete [] strings;
+        delete [] names;
         return false;
+    }
 
     //
     // Now we can process the full shader under proper symbols and rules.
@@ -1577,14 +1584,17 @@ namespace glslang {
 
 #include "../Include/revision.h"
 
+#define QUOTE(s) #s
+#define STR(n) QUOTE(n)
+
 const char* GetEsslVersionString()
 {
-    return "OpenGL ES GLSL 3.20 glslang Khronos." GLSLANG_REVISION " " GLSLANG_DATE;
+    return "OpenGL ES GLSL 3.20 glslang Khronos. " STR(GLSLANG_MINOR_VERSION) "." STR(GLSLANG_PATCH_LEVEL);
 }
 
 const char* GetGlslVersionString()
 {
-    return "4.60 glslang Khronos." GLSLANG_REVISION " " GLSLANG_DATE;
+    return "4.60 glslang Khronos. " STR(GLSLANG_MINOR_VERSION) "." STR(GLSLANG_PATCH_LEVEL);
 }
 
 int GetKhronosToolId()
@@ -1621,6 +1631,7 @@ TShader::TShader(EShLanguage s)
     environment.input.dialect = EShClientNone;
     environment.client.client = EShClientNone;
     environment.target.language = EShTargetNone;
+    environment.target.hlslFunctionality1 = false;
 }
 
 TShader::~TShader()

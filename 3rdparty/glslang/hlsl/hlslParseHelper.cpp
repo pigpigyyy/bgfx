@@ -65,10 +65,10 @@ HlslParseContext::HlslParseContext(TSymbolTable& symbolTable, TIntermediate& int
     entryPointFunction(nullptr),
     entryPointFunctionBody(nullptr),
     gsStreamOutput(nullptr),
-    clipDistanceInput(nullptr),
-    cullDistanceInput(nullptr),
     clipDistanceOutput(nullptr),
-    cullDistanceOutput(nullptr)
+    cullDistanceOutput(nullptr),
+    clipDistanceInput(nullptr),
+    cullDistanceInput(nullptr)
 {
     globalUniformDefaults.clear();
     globalUniformDefaults.layoutMatrix = ElmRowMajor;
@@ -1608,7 +1608,7 @@ void HlslParseContext::addStructBufferHiddenCounterParam(const TSourceLoc& loc, 
     if (! hasStructBuffCounter(*param.type))
         return;
 
-    const TString counterBlockName(getStructBuffCounterName(*param.name));
+    const TString counterBlockName(intermediate.addCounterBufferName(*param.name));
 
     TType counterType;
     counterBufferType(loc, counterType);
@@ -3163,7 +3163,7 @@ void HlslParseContext::counterBufferType(const TSourceLoc& loc, TType& type)
 {
     // Counter type
     TType* counterType = new TType(EbtInt, EvqBuffer);
-    counterType->setFieldName("@count");
+    counterType->setFieldName(intermediate.implicitCounterName);
 
     TTypeList* blockStruct = new TTypeList;
     TTypeLoc  member = { counterType, loc };
@@ -3174,12 +3174,6 @@ void HlslParseContext::counterBufferType(const TSourceLoc& loc, TType& type)
 
     type.shallowCopy(blockType);
     shareStructBufferType(type);
-}
-
-// knowledge of how to construct block name, in one place instead of N places.
-TString HlslParseContext::getStructBuffCounterName(const TString& blockName) const
-{
-    return blockName + "@count";
 }
 
 // declare counter for a structured buffer type
@@ -3195,9 +3189,9 @@ void HlslParseContext::declareStructBufferCounter(const TSourceLoc& loc, const T
     TType blockType;
     counterBufferType(loc, blockType);
 
-    TString* blockName = new TString(getStructBuffCounterName(name));
+    TString* blockName = new TString(intermediate.addCounterBufferName(name));
 
-    // Counter buffer does not have its own counter buffer.  TODO: there should be a better way to track this.
+    // Counter buffer is not yet in use
     structBufferCounter[*blockName] = false;
 
     shareStructBufferType(blockType);
@@ -3211,7 +3205,7 @@ TIntermTyped* HlslParseContext::getStructBufferCounter(const TSourceLoc& loc, TI
     if (buffer == nullptr || ! isStructBufferType(buffer->getType()))
         return nullptr;
 
-    const TString counterBlockName(getStructBuffCounterName(buffer->getAsSymbolNode()->getName()));
+    const TString counterBlockName(intermediate.addCounterBufferName(buffer->getAsSymbolNode()->getName()));
 
     // Mark the counter as being used
     structBufferCounter[counterBlockName] = true;
@@ -3223,7 +3217,6 @@ TIntermTyped* HlslParseContext::getStructBufferCounter(const TSourceLoc& loc, TI
     counterMember->setType(TType(EbtInt));
     return counterMember;
 }
-
 
 //
 // Decompose structure buffer methods into AST
@@ -4559,6 +4552,22 @@ void HlslParseContext::decomposeIntrinsic(const TSourceLoc& loc, TIntermTyped*& 
         return imageAggregate != nullptr && imageAggregate->getOp() == EOpImageLoad;
     };
 
+    const auto lookupBuiltinVariable = [&](const char* name, TBuiltInVariable builtin, TType& type) -> TIntermTyped* {
+        TSymbol* symbol = symbolTable.find(name);
+        if (nullptr == symbol) {
+            type.getQualifier().builtIn = builtin;
+
+            TVariable* variable = new TVariable(new TString(name), type);
+
+            symbolTable.insert(*variable);
+
+            symbol = symbolTable.find(name);
+            assert(symbol && "Inserted symbol could not be found!");
+        }
+
+        return intermediate.addSymbol(*(symbol->getAsVariable()), loc);
+    };
+
     // HLSL intrinsics can be pass through to native AST opcodes, or decomposed here to existing AST
     // opcodes for compatibility with existing software stacks.
     static const bool decomposeHlslIntrinsics = true;
@@ -5115,7 +5124,65 @@ void HlslParseContext::decomposeIntrinsic(const TSourceLoc& loc, TIntermTyped*& 
 
             break;
         }
-        
+    case EOpWaveGetLaneCount:
+        {
+            // Mapped to gl_SubgroupSize builtin (We preprend @ to the symbol
+            // so that it inhabits the symbol table, but has a user-invalid name
+            // in-case some source HLSL defined the symbol also).
+            TType type(EbtUint, EvqVaryingIn);
+            node = lookupBuiltinVariable("@gl_SubgroupSize", EbvSubgroupSize2, type);
+            break;
+        }
+    case EOpWaveGetLaneIndex:
+        {
+            // Mapped to gl_SubgroupInvocationID builtin (We preprend @ to the
+            // symbol so that it inhabits the symbol table, but has a
+            // user-invalid name in-case some source HLSL defined the symbol
+            // also).
+            TType type(EbtUint, EvqVaryingIn);
+            node = lookupBuiltinVariable("@gl_SubgroupInvocationID", EbvSubgroupInvocation2, type);
+            break;
+        }
+    case EOpWaveActiveCountBits:
+        {
+            // Mapped to subgroupBallotBitCount(subgroupBallot()) builtin
+
+            // uvec4 type.
+            TType uvec4Type(EbtUint, EvqTemporary, 4);
+
+            // Get the uvec4 return from subgroupBallot().
+            TIntermTyped* res = intermediate.addBuiltInFunctionCall(loc,
+                EOpSubgroupBallot, true, arguments, uvec4Type);
+
+            // uint type.
+            TType uintType(EbtUint, EvqTemporary);
+
+            node = intermediate.addBuiltInFunctionCall(loc,
+                EOpSubgroupBallotBitCount, true, res, uintType);
+
+            break;
+        }
+    case EOpWavePrefixCountBits:
+        {
+            // Mapped to subgroupBallotInclusiveBitCount(subgroupBallot())
+            // builtin
+
+            // uvec4 type.
+            TType uvec4Type(EbtUint, EvqTemporary, 4);
+
+            // Get the uvec4 return from subgroupBallot().
+            TIntermTyped* res = intermediate.addBuiltInFunctionCall(loc,
+                EOpSubgroupBallot, true, arguments, uvec4Type);
+
+            // uint type.
+            TType uintType(EbtUint, EvqTemporary);
+
+            node = intermediate.addBuiltInFunctionCall(loc,
+                EOpSubgroupBallotInclusiveBitCount, true, res, uintType);
+
+            break;
+        }
+
     default:
         break; // most pass through unchanged
     }
@@ -5669,12 +5736,11 @@ void HlslParseContext::addStructBuffArguments(const TSourceLoc& loc, TIntermAggr
                 TType counterType;
                 counterBufferType(loc, counterType);
 
-                const TString counterBlockName(getStructBuffCounterName(blockSym->getName()));
+                const TString counterBlockName(intermediate.addCounterBufferName(blockSym->getName()));
 
                 TVariable* variable = makeInternalVariable(counterBlockName, counterType);
 
-                // Mark this buffer as requiring a counter block.  TODO: there should be a better
-                // way to track it.
+                // Mark this buffer's counter block as being in use
                 structBufferCounter[counterBlockName] = true;
 
                 TIntermSymbol* sym = intermediate.addSymbol(*variable, loc);
@@ -8246,6 +8312,22 @@ TIntermTyped* HlslParseContext::constructBuiltIn(const TType& type, TOperator op
     // First, convert types as needed.
     //
     switch (op) {
+    case EOpConstructF16Vec2:
+    case EOpConstructF16Vec3:
+    case EOpConstructF16Vec4:
+    case EOpConstructF16Mat2x2:
+    case EOpConstructF16Mat2x3:
+    case EOpConstructF16Mat2x4:
+    case EOpConstructF16Mat3x2:
+    case EOpConstructF16Mat3x3:
+    case EOpConstructF16Mat3x4:
+    case EOpConstructF16Mat4x2:
+    case EOpConstructF16Mat4x3:
+    case EOpConstructF16Mat4x4:
+    case EOpConstructFloat16:
+        basicOp = EOpConstructFloat16;
+        break;
+
     case EOpConstructVec2:
     case EOpConstructVec3:
     case EOpConstructVec4:
@@ -8278,6 +8360,13 @@ TIntermTyped* HlslParseContext::constructBuiltIn(const TType& type, TOperator op
         basicOp = EOpConstructDouble;
         break;
 
+    case EOpConstructI16Vec2:
+    case EOpConstructI16Vec3:
+    case EOpConstructI16Vec4:
+    case EOpConstructInt16:
+        basicOp = EOpConstructInt16;
+        break;
+
     case EOpConstructIVec2:
     case EOpConstructIVec3:
     case EOpConstructIVec4:
@@ -8292,6 +8381,13 @@ TIntermTyped* HlslParseContext::constructBuiltIn(const TType& type, TOperator op
     case EOpConstructIMat4x4:
     case EOpConstructInt:
         basicOp = EOpConstructInt;
+        break;
+
+    case EOpConstructU16Vec2:
+    case EOpConstructU16Vec3:
+    case EOpConstructU16Vec4:
+    case EOpConstructUint16:
+        basicOp = EOpConstructUint16;
         break;
 
     case EOpConstructUVec2:
@@ -9840,7 +9936,8 @@ void HlslParseContext::addPatchConstantInvocation()
 }
 
 // Finalization step: remove unused buffer blocks from linkage (we don't know until the
-// shader is entirely compiled)
+// shader is entirely compiled).
+// Preserve order of remaining symbols.
 void HlslParseContext::removeUnusedStructBufferCounters()
 {
     const auto endIt = std::remove_if(linkageSymbols.begin(), linkageSymbols.end(),
