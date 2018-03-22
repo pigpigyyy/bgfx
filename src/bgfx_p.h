@@ -144,8 +144,6 @@ namespace bgfx
 			| BGFX_CLEAR_COLOR_USE_PALETTE \
 			)
 
-#include <list> // mingw wants it to be before tr1/unordered_*...
-
 #if BGFX_CONFIG_USE_TINYSTL
 namespace bgfx
 {
@@ -160,8 +158,42 @@ namespace bgfx
 #	include <tinystl/unordered_map.h>
 #	include <tinystl/unordered_set.h>
 #	include <tinystl/vector.h>
+
+namespace tinystl
+{
+	template<typename T, typename Alloc = TINYSTL_ALLOCATOR>
+	class list : public vector<T, Alloc>
+	{
+	public:
+		void push_front(const T& _value)
+		{
+			this->insert(this->begin(), _value);
+		}
+
+		void pop_front()
+		{
+			this->erase(this->begin() );
+		}
+
+		void sort()
+		{
+			bx::quickSort(
+				this->begin()
+				, uint32_t(this->end() - this->begin() )
+				, sizeof(T)
+				, [](const void* _a, const void* _b) -> int32_t {
+					const T& lhs = *(const T*)(_a);
+					const T& rhs = *(const T*)(_b);
+					return lhs < rhs ? -1 : 1;
+				});
+		}
+	};
+
+} // namespace tinystl
+
 namespace stl = tinystl;
 #else
+#	include <list>
 #	include <string>
 #	include <unordered_map>
 #	include <unordered_set>
@@ -275,6 +307,17 @@ namespace bgfx
 	{
 		return 0 != _decl.m_stride;
 	}
+
+	struct Condition
+	{
+		enum Enum
+		{
+			LessEqual,
+			GreaterEqual,
+		};
+	};
+
+	bool windowsVersionIs(Condition::Enum _op, uint32_t _version);
 
 	struct Clear
 	{
@@ -2546,7 +2589,7 @@ namespace bgfx
 			uint32_t m_size;
 		};
 
-		typedef std::list<Free> FreeList;
+		typedef stl::list<Free> FreeList;
 		FreeList m_free;
 
 		typedef stl::unordered_map<uint64_t, uint32_t> UsedList;
