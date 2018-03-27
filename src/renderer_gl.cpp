@@ -6946,20 +6946,16 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 
 				const uint64_t newFlags = draw.m_stateFlags;
 				uint64_t changedFlags = currentState.m_stateFlags ^ draw.m_stateFlags;
-				currentState.m_stateFlags = newFlags;
 
 				const uint64_t newStencil = draw.m_stencil;
 				uint64_t changedStencil = currentState.m_stencil ^ draw.m_stencil;
-				currentState.m_stencil = newStencil;
 
 				if (resetState)
 				{
 					currentState.clear();
 					currentState.m_scissor = !draw.m_scissor;
-					changedFlags   = BGFX_STATE_MASK;
+					changedFlags = BGFX_STATE_MASK;
 					changedStencil = packStencil(BGFX_STENCIL_MASK, BGFX_STENCIL_MASK);
-					currentState.m_stateFlags = newFlags;
-					currentState.m_stencil    = newStencil;
 
 					currentBind.clear();
 				}
@@ -6998,6 +6994,9 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 							) );
 					}
 				}
+
+				currentState.m_stateFlags = newFlags;
+				currentState.m_stencil    = newStencil;
 
 				if (0 != changedStencil)
 				{
