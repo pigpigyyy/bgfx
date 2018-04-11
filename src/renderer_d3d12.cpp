@@ -676,6 +676,8 @@ namespace bgfx { namespace d3d12
 
 			errorState = ErrorState::LoadedKernel32;
 
+			m_nvapi.init();
+
 			m_d3d12dll = bx::dlopen("d3d12.dll");
 			if (NULL == m_d3d12dll)
 			{
@@ -724,7 +726,7 @@ namespace bgfx { namespace d3d12
 				{
 					if (BX_ENABLED(BGFX_CONFIG_DEBUG) )
 					{
-						debug0->EnableDebugLayer();
+//						debug0->EnableDebugLayer();
 
 #if BX_PLATFORM_WINDOWS
 						{
@@ -736,6 +738,8 @@ namespace bgfx { namespace d3d12
 //								debug1->SetEnableGPUBasedValidation(true);
 //								debug1->SetEnableSynchronizedCommandQueueValidation(true);
 							}
+
+							DX_RELEASE(debug1, 1);
 						}
 #elif BX_PLATFORM_XBOXONE
 						debug0->SetProcessDebugFlags(D3D12_PROCESS_DEBUG_FLAG_DEBUG_LAYER_ENABLED);
@@ -749,8 +753,9 @@ namespace bgfx { namespace d3d12
 						debug0->SetProcessDebugFlags(D3D12XBOX_PROCESS_DEBUG_FLAG_INSTRUMENTED);
 					}
 #endif // BX_PLATFORM_XBOXONE
-				}
 
+					DX_RELEASE(debug0, 0);
+				}
 			}
 
 			{
@@ -789,6 +794,11 @@ namespace bgfx { namespace d3d12
 			}
 
 			m_dxgi.update(m_device);
+
+			if (BGFX_PCI_ID_NVIDIA != m_dxgi.m_adapterDesc.VendorId)
+			{
+				m_nvapi.shutdown();
+			}
 
 			{
 				uint32_t numNodes = m_device->GetNodeCount();
@@ -1201,6 +1211,13 @@ namespace bgfx { namespace d3d12
 				}
 			}
 
+			if (m_nvapi.isInitialized() )
+			{
+				finish();
+				m_commandList = m_cmd.alloc();
+				m_nvapi.initAftermath(m_device, m_commandList);
+			}
+
 			g_internalData.context = m_device;
 			return true;
 
@@ -1229,6 +1246,8 @@ namespace bgfx { namespace d3d12
 #endif // USE_D3D12_DYNAMIC_LIB
 			case ErrorState::Default:
 			default:
+				m_nvapi.shutdown();
+
 				unloadRenderDoc(m_renderdocdll);
 				bx::dlclose(m_winPixEvent);
 				m_winPixEvent = NULL;
@@ -1286,13 +1305,13 @@ namespace bgfx { namespace d3d12
 			}
 
 			DX_RELEASE(m_rootSignature, 0);
-
 			DX_RELEASE(m_swapChain, 0);
 
 			m_cmd.shutdown();
 
-			DX_RELEASE(m_device,  0);
+			DX_RELEASE(m_device, 0);
 
+			m_nvapi.shutdown();
 			m_dxgi.shutdown();
 
 			unloadRenderDoc(m_renderdocdll);
@@ -1907,12 +1926,13 @@ namespace bgfx { namespace d3d12
 				, getCPUHandleHeapStart(m_dsvDescriptorHeap)
 				);
 
+			m_commandList = m_cmd.alloc();
+
 			for (uint32_t ii = 0; ii < BX_COUNTOF(m_frameBuffers); ++ii)
 			{
 				m_frameBuffers[ii].postReset();
 			}
 
-			m_commandList = m_cmd.alloc();
 //			capturePostReset();
 		}
 
@@ -2444,14 +2464,22 @@ data.NumQualityLevels = 0;
 				if (DxbcOperandType::ConstantBuffer == operand.type)
 				{
 					if (DxbcOperandAddrMode::Imm32 == operand.addrMode[0]
-					&&  0 == operand.regIndex[0]
-					&&  DxbcOperandAddrMode::Imm32 == operand.addrMode[1])
+					&&  0 == operand.regIndex[0])
 					{
-						operand.regIndex[1] += cast.offset;
-					}
-					else if (DxbcOperandAddrMode::RegImm32 == operand.addrMode[1])
-					{
-						operand.regIndex[1] += cast.offset;
+						for (uint32_t jj = 1; jj < operand.numAddrModes; ++jj)
+						{
+							if (DxbcOperandAddrMode::Imm32    == operand.addrMode[jj]
+							||  DxbcOperandAddrMode::RegImm32 == operand.addrMode[jj])
+							{
+								operand.regIndex[jj] += cast.offset;
+							}
+							else if (0 != cast.offset)
+							{
+								operand.subOperand[jj].regIndex = operand.regIndex[jj];
+								operand.addrMode[jj] = DxbcOperandAddrMode::RegImm32;
+								operand.regIndex[jj] = cast.offset;
+							}
+						}
 					}
 				}
 			}
@@ -2559,10 +2587,7 @@ data.NumQualityLevels = 0;
 
 			if (NULL != program.m_fsh)
 			{
- 				temp = alloc(program.m_fsh->m_code->size);
- 				bx::memSet(temp->data, 0, temp->size);
  				bx::MemoryReader rd(program.m_fsh->m_code->data, program.m_fsh->m_code->size);
- 				bx::StaticMemoryBlockWriter wr(temp->data, temp->size);
 
 				DxbcContext dxbc;
 				bx::Error err;
@@ -2575,9 +2600,11 @@ data.NumQualityLevels = 0;
 					union { uint32_t offset; void* ptr; } cast = { 0 };
 					filter(dxbc.shader, dxbc.shader, patchCb0, cast.ptr);
 
-					write(&wr, dxbc, &err);
+					temp = alloc(uint32_t(dxbc.shader.byteCode.size() )+1024);
+					bx::StaticMemoryBlockWriter wr(temp->data, temp->size);
 
-					dxbcHash(temp->data + 20, temp->size - 20, temp->data + 4);
+					int32_t size = write(&wr, dxbc, &err);
+					dxbcHash(temp->data + 20, size - 20, temp->data + 4);
 
 					patchShader = 0 == bx::memCmp(program.m_fsh->m_code->data, temp->data, 16);
 					BX_CHECK(patchShader, "DXBC fragment shader patching error (ShaderHandle: %d).", program.m_fsh - m_shaders);
@@ -2597,23 +2624,27 @@ data.NumQualityLevels = 0;
 						desc.PS.pShaderBytecode = program.m_fsh->m_code->data;
 						desc.PS.BytecodeLength  = program.m_fsh->m_code->size;
 					}
+
+					release(temp);
+					temp = NULL;
 				}
 
 				if (patchShader)
 				{
-					bx::memCopy(temp->data, program.m_fsh->m_code->data, program.m_fsh->m_code->size);
-
-					bx::seek(&wr, 0, bx::Whence::Begin);
 					union { uint32_t offset; void* ptr; } cast =
 					{
 						uint32_t(program.m_vsh->m_size)/16
 					};
 					filter(dxbc.shader, dxbc.shader, patchCb0, cast.ptr);
-					write(&wr, dxbc, &err);
-					dxbcHash(temp->data + 20, temp->size - 20, temp->data + 4);
+
+					temp = alloc(uint32_t(dxbc.shader.byteCode.size() )+1024);
+					bx::StaticMemoryBlockWriter wr(temp->data, temp->size);
+
+					int32_t size = write(&wr, dxbc, &err);
+					dxbcHash(temp->data + 20, size - 20, temp->data + 4);
 
 					desc.PS.pShaderBytecode = temp->data;
-					desc.PS.BytecodeLength  = temp->size;
+					desc.PS.BytecodeLength  = size;
 				}
 				else
 				{
@@ -2975,6 +3006,7 @@ data.NumQualityLevels = 0;
 		}
 
 		Dxgi m_dxgi;
+		NvApi m_nvapi;
 
 		void* m_kernel32dll;
 		void* m_d3d12dll;
@@ -4797,15 +4829,10 @@ data.NumQualityLevels = 0;
 	{
 		if (m_needPresent)
 		{
-#if 1
 			HRESULT hr = m_swapChain->Present(_syncInterval, _flags);
 			hr = !isLost(hr) ? S_OK : hr;
 			m_needPresent = false;
 			return hr;
-#else
-			m_needPresent = false;
-			return S_OK;
-#endif // 0
 		}
 
 		return S_OK;
@@ -4868,6 +4895,15 @@ data.NumQualityLevels = 0;
 							, &dsvDesc
 							, dsvDescriptor
 							);
+
+						s_renderD3D12->m_commandList->ClearDepthStencilView(
+							  dsvDescriptor
+							, D3D12_CLEAR_FLAG_DEPTH|D3D12_CLEAR_FLAG_STENCIL
+							, 0.0f
+							, 0
+							, 0
+							, NULL
+							);
 					}
 					else
 					{
@@ -4922,6 +4958,15 @@ data.NumQualityLevels = 0;
 							, &desc
 							, rtv
 							);
+
+						float rgba[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+						s_renderD3D12->m_commandList->ClearRenderTargetView(
+							  rtv
+							, rgba
+							, 0
+							, NULL
+							);
+
 						m_num++;
 					}
 				}
@@ -5481,6 +5526,8 @@ data.NumQualityLevels = 0;
 					m_batch.flush(m_commandList, true);
 					kick();
 
+					commandListChanged = true;
+
 					view = key.m_view;
 					currentPso = NULL;
 					currentSamplerStateIdx = kInvalidHandle;
@@ -5546,6 +5593,13 @@ data.NumQualityLevels = 0;
 							PIX3_ENDEVENT(m_commandList);
 							PIX3_BEGINEVENT(m_commandList, D3DCOLOR_COMPUTE, viewName);
 						}
+
+						commandListChanged = true;
+					}
+
+					if (commandListChanged)
+					{
+						commandListChanged = false;
 
 						m_commandList->SetComputeRootSignature(m_rootSignature);
 						ID3D12DescriptorHeap* heaps[] = {
@@ -5712,10 +5766,7 @@ data.NumQualityLevels = 0;
 
 				if (wasCompute)
 				{
-					if (wasCompute)
-					{
-						wasCompute = false;
-					}
+					wasCompute = false;
 
 					if (BX_ENABLED(BGFX_CONFIG_DEBUG_PIX) )
 					{
@@ -5747,6 +5798,7 @@ data.NumQualityLevels = 0;
 							currentState.clear();
 							currentState.m_scissor = !draw.m_scissor;
 							currentBind.clear();
+							commandListChanged = true;
 						}
 
 						continue;

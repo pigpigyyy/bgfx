@@ -1648,8 +1648,14 @@ namespace bgfx
 		Resolution resolution;
 	};
 
+	struct IndexBuffer
+	{
+		uint32_t m_size;
+	};
+
 	struct VertexBuffer
 	{
+		uint32_t m_size;
 		uint16_t m_stride;
 	};
 
@@ -2679,6 +2685,8 @@ namespace bgfx
 			, m_colorPaletteDirty(0)
 			, m_frames(0)
 			, m_debug(BGFX_DEBUG_NONE)
+			, m_rtMemoryUsed(0)
+			, m_textureMemoryUsed(0)
 			, m_renderCtx(NULL)
 			, m_renderMain(NULL)
 			, m_renderNoop(NULL)
@@ -2819,6 +2827,9 @@ namespace bgfx
 			stats.numVertexBuffers        = m_vertexBufferHandle.getNumHandles();
 			stats.numVertexDecls          = m_vertexDeclHandle.getNumHandles();
 
+			stats.textureMemoryUsed = m_textureMemoryUsed;
+			stats.rtMemoryUsed      = m_rtMemoryUsed;
+
 			return &stats;
 		}
 
@@ -2831,6 +2842,9 @@ namespace bgfx
 			BX_WARN(isValid(handle), "Failed to allocate index buffer handle.");
 			if (isValid(handle) )
 			{
+				IndexBuffer& ib = m_indexBuffers[handle.idx];
+				ib.m_size = _mem->size;
+
 				CommandBuffer& cmdbuf = getCommandBuffer(CommandBuffer::CreateIndexBuffer);
 				cmdbuf.write(handle);
 				cmdbuf.write(_mem);
@@ -2894,7 +2908,9 @@ namespace bgfx
 
 				m_declRef.add(handle, declHandle, _decl.m_hash);
 
-				m_vertexBuffers[handle.idx].m_stride = _decl.m_stride;
+				VertexBuffer& vb = m_vertexBuffers[handle.idx];
+				vb.m_size   = _mem->size;
+				vb.m_stride = _decl.m_stride;
 
 				CommandBuffer& cmdbuf = getCommandBuffer(CommandBuffer::CreateVertexBuffer);
 				cmdbuf.write(handle);
@@ -2945,10 +2961,13 @@ namespace bgfx
 				BX_WARN(isValid(indexBufferHandle), "Failed to allocate index buffer handle.");
 				if (!isValid(indexBufferHandle) )
 				{
-					return ptr;
+					return NonLocalAllocator::kInvalidBlock;
 				}
 
 				const uint32_t allocSize = bx::max<uint32_t>(BGFX_CONFIG_DYNAMIC_INDEX_BUFFER_SIZE, _size);
+
+				IndexBuffer& ib = m_indexBuffers[indexBufferHandle.idx];
+				ib.m_size = allocSize;
 
 				CommandBuffer& cmdbuf = getCommandBuffer(CommandBuffer::CreateDynamicIndexBuffer);
 				cmdbuf.write(indexBufferHandle);
@@ -2978,6 +2997,9 @@ namespace bgfx
 				{
 					return handle;
 				}
+
+				IndexBuffer& ib = m_indexBuffers[indexBufferHandle.idx];
+				ib.m_size = size;
 
 				CommandBuffer& cmdbuf = getCommandBuffer(CommandBuffer::CreateDynamicIndexBuffer);
 				cmdbuf.write(indexBufferHandle);
@@ -3058,7 +3080,7 @@ namespace bgfx
 			const uint32_t offset = (dib.m_startIndex + _startIndex)*indexSize;
 			const uint32_t size   = bx::min<uint32_t>(offset
 				+ bx::min(bx::uint32_satsub(dib.m_size, _startIndex*indexSize), _mem->size)
-				, BGFX_CONFIG_DYNAMIC_INDEX_BUFFER_SIZE) - offset
+				, m_indexBuffers[dib.m_handle.idx].m_size) - offset
 				;
 			BX_CHECK(_mem->size <= size, "Truncating dynamic index buffer update (size %d, mem size %d)."
 				, size
@@ -3110,7 +3132,6 @@ namespace bgfx
 			if (ptr == NonLocalAllocator::kInvalidBlock)
 			{
 				VertexBufferHandle vertexBufferHandle = { m_vertexBufferHandle.alloc() };
-
 				BX_WARN(isValid(vertexBufferHandle), "Failed to allocate dynamic vertex buffer handle.");
 				if (!isValid(vertexBufferHandle) )
 				{
@@ -3118,6 +3139,10 @@ namespace bgfx
 				}
 
 				const uint32_t allocSize = bx::max<uint32_t>(BGFX_CONFIG_DYNAMIC_VERTEX_BUFFER_SIZE, _size);
+
+				VertexBuffer& vb = m_vertexBuffers[vertexBufferHandle.idx];
+				vb.m_size   = allocSize;
+				vb.m_stride = 0;
 
 				CommandBuffer& cmdbuf = getCommandBuffer(CommandBuffer::CreateDynamicVertexBuffer);
 				cmdbuf.write(vertexBufferHandle);
@@ -3147,6 +3172,10 @@ namespace bgfx
 					BX_TRACE("WARNING: Failed to allocate vertex buffer handle (BGFX_CONFIG_MAX_VERTEX_BUFFERS, max: %d).", BGFX_CONFIG_MAX_VERTEX_BUFFERS);
 					return handle;
 				}
+
+				VertexBuffer& vb = m_vertexBuffers[vertexBufferHandle.idx];
+				vb.m_size   = size;
+				vb.m_stride = 0;
 
 				CommandBuffer& cmdbuf = getCommandBuffer(CommandBuffer::CreateDynamicVertexBuffer);
 				cmdbuf.write(vertexBufferHandle);
@@ -3237,7 +3266,7 @@ namespace bgfx
 			const uint32_t offset = (dvb.m_startVertex + _startVertex)*dvb.m_stride;
 			const uint32_t size   = bx::min<uint32_t>(offset
 				+ bx::min(bx::uint32_satsub(dvb.m_size, _startVertex*dvb.m_stride), _mem->size)
-				, BGFX_CONFIG_DYNAMIC_VERTEX_BUFFER_SIZE) - offset
+				, m_vertexBuffers[dvb.m_handle.idx].m_size) - offset
 				;
 			BX_CHECK(_mem->size <= size, "Truncating dynamic vertex buffer update (size %d, mem size %d)."
 				, size
@@ -3869,10 +3898,21 @@ namespace bgfx
 				TextureRef& ref = m_textureRef[handle.idx];
 				ref.init(_ratio
 					, _info->format
+					, _info->storageSize
 					, imageContainer.m_numMips
 					, 0 != (g_caps.supported & BGFX_CAPS_TEXTURE_DIRECT_ACCESS)
 					, _immutable
+					, 0 != (_flags & BGFX_TEXTURE_RT_MASK)
 					);
+
+				if (ref.m_rt)
+				{
+					m_rtMemoryUsed += int64_t(ref.m_storageSize);
+				}
+				else
+				{
+					m_textureMemoryUsed += int64_t(ref.m_storageSize);
+				}
 
 				CommandBuffer& cmdbuf = getCommandBuffer(CommandBuffer::CreateTexture);
 				cmdbuf.write(handle);
@@ -3990,6 +4030,15 @@ namespace bgfx
 			if (0 == refs)
 			{
 				ref.m_name.clear();
+
+				if (ref.m_rt)
+				{
+					m_rtMemoryUsed -= int64_t(ref.m_storageSize);
+				}
+				else
+				{
+					m_textureMemoryUsed -= int64_t(ref.m_storageSize);
+				}
 
 				bool ok = m_submit->free(_handle); BX_UNUSED(ok);
 				BX_CHECK(ok, "Texture handle %d is already destroyed!", _handle.idx);
@@ -4591,6 +4640,7 @@ namespace bgfx
 		uint64_t m_tempKeys[BGFX_CONFIG_MAX_DRAW_CALLS];
 		RenderItemCount m_tempValues[BGFX_CONFIG_MAX_DRAW_CALLS];
 
+		IndexBuffer  m_indexBuffers[BGFX_CONFIG_MAX_INDEX_BUFFERS];
 		VertexBuffer m_vertexBuffers[BGFX_CONFIG_MAX_VERTEX_BUFFERS];
 
 		DynamicIndexBuffer  m_dynamicIndexBuffers[BGFX_CONFIG_MAX_DYNAMIC_INDEX_BUFFERS];
@@ -4648,28 +4698,34 @@ namespace bgfx
 			void init(
 				  BackbufferRatio::Enum _ratio
 				, TextureFormat::Enum _format
+				, uint32_t _storageSize
 				, uint8_t _numMips
 				, bool _ptrPending
 				, bool _immutable
+				, bool _rt
 				)
 			{
-				m_ptr       = _ptrPending ? (void*)UINTPTR_MAX : NULL;
-				m_refCount  = 1;
-				m_bbRatio   = uint8_t(_ratio);
-				m_format    = uint8_t(_format);
-				m_numMips   = _numMips;
-				m_owned     = false;
-				m_immutable = _immutable;
+				m_ptr         = _ptrPending ? (void*)UINTPTR_MAX : NULL;
+				m_storageSize = _storageSize;
+				m_refCount    = 1;
+				m_bbRatio     = uint8_t(_ratio);
+				m_format      = uint8_t(_format);
+				m_numMips     = _numMips;
+				m_owned       = false;
+				m_immutable   = _immutable;
+				m_rt          = _rt;
 			}
 
-			String  m_name;
-			void*   m_ptr;
-			int16_t m_refCount;
-			uint8_t m_bbRatio;
-			uint8_t m_format;
-			uint8_t m_numMips;
-			bool    m_owned;
-			bool    m_immutable;
+			String   m_name;
+			void*    m_ptr;
+			uint32_t m_storageSize;
+			int16_t  m_refCount;
+			uint8_t  m_bbRatio;
+			uint8_t  m_format;
+			uint8_t  m_numMips;
+			bool     m_owned;
+			bool     m_immutable;
+			bool     m_rt;
 		};
 
 		struct FrameBufferRef
@@ -4710,6 +4766,9 @@ namespace bgfx
 		int64_t  m_frameTimeLast;
 		uint32_t m_frames;
 		uint32_t m_debug;
+
+		int64_t m_rtMemoryUsed;
+		int64_t m_textureMemoryUsed;
 
 		TextVideoMemBlitter m_textVideoMemBlitter;
 		ClearQuad m_clearQuad;

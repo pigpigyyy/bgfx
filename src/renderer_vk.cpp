@@ -838,9 +838,10 @@ VK_IMPORT
 			errorState = ErrorState::InstanceCreated;
 
 			BX_TRACE("Instance functions:");
-#define VK_IMPORT_INSTANCE_FUNC(_optional, _func) \
+
+#define VK_IMPORT_INSTANCE_FUNC(_optional, _func)                           \
 			_func = (PFN_##_func)vkGetInstanceProcAddr(m_instance, #_func); \
-			BX_TRACE("\t%p " #_func, _func); \
+			BX_TRACE("\t%p " #_func, _func);                                \
 			imported &= _optional || NULL != _func
 VK_IMPORT_INSTANCE
 #undef VK_IMPORT_INSTANCE_FUNC
@@ -852,6 +853,7 @@ VK_IMPORT_INSTANCE
 			}
 
 			m_debugReportCallback = VK_NULL_HANDLE;
+
 			if (BX_ENABLED(BGFX_CONFIG_DEBUG) )
 			{
 				VkDebugReportCallbackCreateInfoEXT drcb;
@@ -1282,14 +1284,23 @@ VK_IMPORT_DEVICE
 
 				if (VK_SUCCESS != result)
 				{
-					VkXcbSurfaceCreateInfoKHR sci;
-					sci.sType = VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR;
-					sci.pNext = NULL;
-					sci.flags      = 0;
-					sci.connection = (xcb_connection_t*)g_platformData.ndt;
-					union { void* ptr; xcb_window_t window; } cast = { g_platformData.nwh };
-					sci.window = cast.window;
-					result = vkCreateXcbSurfaceKHR(m_instance, &sci, m_allocatorCb, &m_surface);
+					void* xcbdll = bx::dlopen("libX11-xcb.so.1");
+					if (NULL != xcbdll)
+					{
+						typedef xcb_connection_t* (*PFN_XGETXCBCONNECTION)(Display*);
+						PFN_XGETXCBCONNECTION XGetXCBConnection = (PFN_XGETXCBCONNECTION)bx::dlsym(xcbdll, "XGetXCBConnection");
+
+						VkXcbSurfaceCreateInfoKHR sci;
+						sci.sType = VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR;
+						sci.pNext = NULL;
+						sci.flags      = 0;
+						sci.connection = XGetXCBConnection( (Display*)g_platformData.ndt);
+						union { void* ptr; xcb_window_t window; } cast = { g_platformData.nwh };
+						sci.window = cast.window;
+						result = vkCreateXcbSurfaceKHR(m_instance, &sci, m_allocatorCb, &m_surface);
+
+						bx::dlclose(xcbdll);
+					}
 				}
 			}
 #else
@@ -3529,8 +3540,8 @@ VK_DESTROY
 			, shaderSize
 			);
 #else
-#include "../examples/runtime/shaders/spv/vert.spv.h"
-#include "../examples/runtime/shaders/spv/frag.spv.h"
+#include "../examples/runtime/shaders/spirv/vert.spv.h"
+#include "../examples/runtime/shaders/spirv/frag.spv.h"
 
 		shaderSize = BGFX_CHUNK_MAGIC_VSH == magic
 			? sizeof(vs_cubes_spv)
