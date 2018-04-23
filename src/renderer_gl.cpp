@@ -889,6 +889,15 @@ namespace bgfx { namespace gl
 		NULL
 	};
 
+	static const char* s_uint[] =
+	{
+		"uint",
+		"uvec2",
+		"uvec3",
+		"uvec4",
+		NULL
+	};
+
 	static const char* s_texelFetch[] =
 	{
 		"texture",
@@ -1762,7 +1771,7 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 			bx::memSet(m_uniforms, 0, sizeof(m_uniforms) );
 			bx::memSet(&m_resolution, 0, sizeof(m_resolution) );
 
-			setRenderContextSize(_init.resolution.m_width, _init.resolution.m_height);
+			setRenderContextSize(_init.resolution.width, _init.resolution.height);
 
 			// Must be after context is initialized?!
 			VRImplI* vrImpl = NULL;
@@ -2322,7 +2331,9 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 				||  s_extension[Extension::EXT_draw_buffers  ].m_supported
 				||  s_extension[Extension::WEBGL_draw_buffers].m_supported)
 				{
-					g_caps.limits.maxFBAttachments = uint8_t(bx::uint32_min(glGet(GL_MAX_DRAW_BUFFERS)
+					g_caps.limits.maxFBAttachments = uint8_t(bx::uint32_clamp(
+							  glGet(GL_MAX_DRAW_BUFFERS)
+							, 1
 							, BGFX_CONFIG_MAX_FRAME_BUFFER_ATTACHMENTS)
 							);
 				}
@@ -2913,8 +2924,8 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 		void requestScreenShot(FrameBufferHandle _handle, const char* _filePath) override
 		{
 			SwapChainGL* swapChain = NULL;
-			uint32_t width  = m_resolution.m_width;
-			uint32_t height = m_resolution.m_height;
+			uint32_t width  = m_resolution.width;
+			uint32_t height = m_resolution.height;
 
 			if (isValid(_handle) )
 			{
@@ -3005,8 +3016,8 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 				GL_CHECK(glBindVertexArray(m_vao) );
 			}
 
-			uint32_t width  = m_resolution.m_width;
-			uint32_t height = m_resolution.m_height;
+			uint32_t width  = m_resolution.width;
+			uint32_t height = m_resolution.height;
 
 			GL_CHECK(glBindFramebuffer(GL_FRAMEBUFFER, m_backBufferFbo) );
 			GL_CHECK(glViewport(0, 0, width, height) );
@@ -3077,15 +3088,15 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 
 		void updateResolution(const Resolution& _resolution)
 		{
-			bool recenter   = !!(_resolution.m_flags & BGFX_RESET_HMD_RECENTER);
-			m_maxAnisotropy = !!(_resolution.m_flags & BGFX_RESET_MAXANISOTROPY)
+			bool recenter   = !!(_resolution.reset & BGFX_RESET_HMD_RECENTER);
+			m_maxAnisotropy = !!(_resolution.reset & BGFX_RESET_MAXANISOTROPY)
 				? m_maxAnisotropyDefault
 				: 0.0f
 				;
 
 			if (s_extension[Extension::ARB_depth_clamp].m_supported)
 			{
-				if (!!(_resolution.m_flags & BGFX_RESET_DEPTH_CLAMP) )
+				if (!!(_resolution.reset & BGFX_RESET_DEPTH_CLAMP) )
 				{
 					GL_CHECK(glEnable(GL_DEPTH_CLAMP) );
 				}
@@ -3102,16 +3113,16 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 				| BGFX_RESET_SUSPEND
 				);
 
-			if (m_resolution.m_width            !=  _resolution.m_width
-			||  m_resolution.m_height           !=  _resolution.m_height
-			|| (m_resolution.m_flags&maskFlags) != (_resolution.m_flags&maskFlags) )
+			if (m_resolution.width            !=  _resolution.width
+			||  m_resolution.height           !=  _resolution.height
+			|| (m_resolution.reset&maskFlags) != (_resolution.reset&maskFlags) )
 			{
-				uint32_t flags = _resolution.m_flags & (~BGFX_RESET_INTERNAL_FORCE);
+				uint32_t flags = _resolution.reset & (~BGFX_RESET_INTERNAL_FORCE);
 
 				m_resolution = _resolution;
-				m_resolution.m_flags = flags;
+				m_resolution.reset = flags;
 
-				m_textVideoMem.resize(false, _resolution.m_width, _resolution.m_height);
+				m_textVideoMem.resize(false, _resolution.width, _resolution.height);
 				m_textVideoMem.clear();
 
 				if ( (flags & BGFX_RESET_HMD)
@@ -3120,8 +3131,8 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 					flags &= ~BGFX_RESET_MSAA_MASK;
 				}
 
-				setRenderContextSize(m_resolution.m_width
-						, m_resolution.m_height
+				setRenderContextSize(m_resolution.width
+						, m_resolution.height
 						, flags
 						);
 				updateCapture();
@@ -3201,7 +3212,7 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 
 				if (m_srgbWriteControlSupport)
 				{
-					if (0 != (m_resolution.m_flags & BGFX_RESET_SRGB_BACKBUFFER) )
+					if (0 != (m_resolution.reset & BGFX_RESET_SRGB_BACKBUFFER) )
 					{
 						GL_CHECK(glEnable(GL_FRAMEBUFFER_SRGB) );
 					}
@@ -3303,8 +3314,8 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 				GL_CHECK(glBindFramebuffer(GL_FRAMEBUFFER, m_backBufferFbo) );
 				GL_CHECK(glBindFramebuffer(GL_READ_FRAMEBUFFER, m_msaaBackBufferFbo) );
 				GL_CHECK(glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0) );
-				uint32_t width  = m_resolution.m_width;
-				uint32_t height = m_resolution.m_height;
+				uint32_t width  = m_resolution.width;
+				uint32_t height = m_resolution.height;
 				GLenum filter = BX_ENABLED(BGFX_CONFIG_RENDERER_OPENGL) || BX_ENABLED(BGFX_CONFIG_RENDERER_OPENGLES < 30)
 					? GL_NEAREST
 					: GL_LINEAR
@@ -3498,11 +3509,11 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 
 		void updateCapture()
 		{
-			if (m_resolution.m_flags&BGFX_RESET_CAPTURE)
+			if (m_resolution.reset&BGFX_RESET_CAPTURE)
 			{
-				m_captureSize = m_resolution.m_width*m_resolution.m_height*4;
+				m_captureSize = m_resolution.width*m_resolution.height*4;
 				m_capture = BX_REALLOC(g_allocator, m_capture, m_captureSize);
-				g_callback->captureBegin(m_resolution.m_width, m_resolution.m_height, m_resolution.m_width*4, TextureFormat::BGRA8, true);
+				g_callback->captureBegin(m_resolution.width, m_resolution.height, m_resolution.width*4, TextureFormat::BGRA8, true);
 			}
 			else
 			{
@@ -3516,8 +3527,8 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 			{
 				GL_CHECK(glReadPixels(0
 					, 0
-					, m_resolution.m_width
-					, m_resolution.m_height
+					, m_resolution.width
+					, m_resolution.height
 					, m_readPixelsFmt
 					, GL_UNSIGNED_BYTE
 					, m_capture
@@ -3527,11 +3538,11 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 				{
 					bimg::imageSwizzleBgra8(
 						  m_capture
-						, m_resolution.m_width*4
-						, m_resolution.m_width
-						, m_resolution.m_height
+						, m_resolution.width*4
+						, m_resolution.width
+						, m_resolution.height
 						, m_capture
-						, m_resolution.m_width*4
+						, m_resolution.width*4
 						);
 				}
 
@@ -5783,6 +5794,7 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 					const bool usesGpuShader4   = !!bx::findIdentifierMatch(code, s_EXT_gpu_shader4);
 					const bool usesGpuShader5   = !!bx::findIdentifierMatch(code, s_ARB_gpu_shader5);
 					const bool usesIUsamplers   = !!bx::findIdentifierMatch(code, s_uisamplers);
+					const bool usesUint         = !!bx::findIdentifierMatch(code, s_uint);
 					const bool usesTexelFetch   = !!bx::findIdentifierMatch(code, s_texelFetch);
 					const bool usesTextureArray = !!bx::findIdentifierMatch(code, s_textureArray);
 					const bool usesTexture3D    = !!bx::findIdentifierMatch(code, s_texture3D);
@@ -5794,6 +5806,7 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 						:  usesTextureArray
 						|| usesTexture3D
 						|| usesIUsamplers
+						|| usesUint
 						|| usesTexelFetch
 						|| usesGpuShader5
 						|| usesInterpQ   ? 130
@@ -6594,7 +6607,7 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 
 		int32_t resolutionHeight = hmdEnabled
 					? _render->m_hmd.height
-					: _render->m_resolution.m_height
+					: _render->m_resolution.height
 					;
 		uint32_t blendFactor = 0;
 
@@ -6687,7 +6700,7 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 						fbh = _render->m_view[view].m_fbh;
 						resolutionHeight = hmdEnabled
 							? _render->m_hmd.height
-							: _render->m_resolution.m_height
+							: _render->m_resolution.height
 							;
 						resolutionHeight = setFrameBuffer(fbh, resolutionHeight, discardFlags);
 					}
@@ -7643,7 +7656,7 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 
 			if (0 < _render->m_numRenderItems)
 			{
-				if (0 != (m_resolution.m_flags & BGFX_RESET_FLUSH_AFTER_RENDER) )
+				if (0 != (m_resolution.reset & BGFX_RESET_FLUSH_AFTER_RENDER) )
 				{
 					GL_CHECK(glFlush() );
 				}
@@ -7736,13 +7749,13 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 				char hmd[16];
 				bx::snprintf(hmd, BX_COUNTOF(hmd), ", [%c] HMD ", hmdEnabled ? '\xfe' : ' ');
 
-				const uint32_t msaa = (m_resolution.m_flags&BGFX_RESET_MSAA_MASK)>>BGFX_RESET_MSAA_SHIFT;
+				const uint32_t msaa = (m_resolution.reset&BGFX_RESET_MSAA_MASK)>>BGFX_RESET_MSAA_SHIFT;
 				tvm.printf(10, pos++, 0x8b, "  Reset flags: [%c] vsync, [%c] MSAAx%d%s, [%c] MaxAnisotropy "
-					, !!(m_resolution.m_flags&BGFX_RESET_VSYNC) ? '\xfe' : ' '
+					, !!(m_resolution.reset&BGFX_RESET_VSYNC) ? '\xfe' : ' '
 					, 0 != msaa ? '\xfe' : ' '
 					, 1<<msaa
 					, m_ovr.isInitialized() ? hmd : ", no-HMD "
-					, !!(m_resolution.m_flags&BGFX_RESET_MAXANISOTROPY) ? '\xfe' : ' '
+					, !!(m_resolution.reset&BGFX_RESET_MAXANISOTROPY) ? '\xfe' : ' '
 					);
 
 				double elapsedCpuMs = double(frameTime)*toMs;
