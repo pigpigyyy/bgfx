@@ -25,23 +25,23 @@
 #include <inttypes.h>
 
 // Check handle, cannot be bgfx::kInvalidHandle and must be valid.
-#define BGFX_CHECK_HANDLE(_desc, _handleAlloc, _handle) \
-			BX_CHECK(isValid(_handle) \
-				&& _handleAlloc.isValid(_handle.idx) \
+#define BGFX_CHECK_HANDLE(_desc, _handleAlloc, _handle)    \
+			BX_CHECK(isValid(_handle)                      \
+				&& _handleAlloc.isValid(_handle.idx)       \
 				, "Invalid handle. %s handle: %d (max %d)" \
-				, _desc \
-				, _handle.idx \
-				, _handleAlloc.getMaxHandles() \
+				, _desc                                    \
+				, _handle.idx                              \
+				, _handleAlloc.getMaxHandles()             \
 				)
 
 // Check handle, it's ok to be bgfx::kInvalidHandle or must be valid.
 #define BGFX_CHECK_HANDLE_INVALID_OK(_desc, _handleAlloc, _handle) \
-			BX_CHECK(!isValid(_handle) \
-				|| _handleAlloc.isValid(_handle.idx) \
-				, "Invalid handle. %s handle: %d (max %d)" \
-				, _desc \
-				, _handle.idx \
-				, _handleAlloc.getMaxHandles() \
+			BX_CHECK(!isValid(_handle)                             \
+				|| _handleAlloc.isValid(_handle.idx)               \
+				, "Invalid handle. %s handle: %d (max %d)"         \
+				, _desc                                            \
+				, _handle.idx                                      \
+				, _handleAlloc.getMaxHandles()                     \
 				)
 
 #if BGFX_CONFIG_MULTITHREADED
@@ -178,7 +178,7 @@ namespace tinystl
 		void sort()
 		{
 			bx::quickSort(
-				this->begin()
+				  this->begin()
 				, uint32_t(this->end() - this->begin() )
 				, sizeof(T)
 				, [](const void* _a, const void* _b) -> int32_t {
@@ -207,7 +207,7 @@ namespace stl = std;
 #	include <windows.h>
 #endif // BX_PLATFORM_*
 
-#define BGFX_MAX_COMPUTE_BINDINGS 8
+#define BGFX_MAX_COMPUTE_BINDINGS BGFX_CONFIG_MAX_TEXTURE_SAMPLERS
 
 #define BGFX_TEXTURE_INTERNAL_DEFAULT_SAMPLER  UINT32_C(0x10000000)
 #define BGFX_TEXTURE_INTERNAL_SHARED           UINT32_C(0x20000000)
@@ -454,6 +454,16 @@ namespace bgfx
 		}
 	};
 
+	void setGraphicsDebuggerPresent(bool _present);
+	bool isGraphicsDebuggerPresent();
+	void release(const Memory* _mem);
+	const char* getAttribName(Attrib::Enum _attr);
+	void getTextureSizeFromRatio(BackbufferRatio::Enum _ratio, uint16_t& _width, uint16_t& _height);
+	TextureFormat::Enum getViableTextureFormat(const bimg::ImageContainer& _imageContainer);
+	const char* getName(TextureFormat::Enum _fmt);
+	const char* getName(UniformHandle _handle);
+	const char* getName(Topology::Enum _topology);
+
 	template<typename Ty>
 	inline void release(Ty)
 	{
@@ -464,15 +474,6 @@ namespace bgfx
 	{
 		release( (const Memory*)_mem);
 	}
-
-	void setGraphicsDebuggerPresent(bool _present);
-	bool isGraphicsDebuggerPresent();
-	void release(const Memory* _mem);
-	const char* getAttribName(Attrib::Enum _attr);
-	void getTextureSizeFromRatio(BackbufferRatio::Enum _ratio, uint16_t& _width, uint16_t& _height);
-	TextureFormat::Enum getViableTextureFormat(const bimg::ImageContainer& _imageContainer);
-	const char* getName(TextureFormat::Enum _fmt);
-	const char* getName(UniformHandle _handle);
 
 	inline uint32_t castfu(float _value)
 	{
@@ -1393,7 +1394,6 @@ namespace bgfx
 
 	struct UniformRegInfo
 	{
-		const void* m_data;
 		UniformHandle m_handle;
 	};
 
@@ -1419,7 +1419,7 @@ namespace bgfx
 			return NULL;
 		}
 
-		const UniformRegInfo& add(UniformHandle _handle, const char* _name, const void* _data)
+		const UniformRegInfo& add(UniformHandle _handle, const char* _name)
 		{
 			BX_CHECK(isValid(_handle), "Uniform handle is invalid (name: %s)!", _name);
 			const uint32_t key = bx::hash<bx::HashMurmur2A>(_name);
@@ -1427,7 +1427,6 @@ namespace bgfx
 			m_uniforms.insert(key, _handle.idx);
 
 			UniformRegInfo& info = m_info[_handle.idx];
-			info.m_data   = _data;
 			info.m_handle = _handle;
 
 			return info;
