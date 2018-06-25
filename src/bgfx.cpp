@@ -362,7 +362,7 @@ namespace bgfx
 		tc.m_height    = _height;
 		tc.m_depth     = 0;
 		tc.m_numLayers = 1;
-		tc.m_numMips   = uint8_t(bx::uint16_max(1, _numMips) );
+		tc.m_numMips   = bx::max<uint8_t>(1, _numMips);
 		tc.m_format    = _format;
 		tc.m_cubeMap   = false;
 		tc.m_mem       = NULL;
@@ -2815,6 +2815,8 @@ namespace bgfx
 		: type(RendererType::Count)
 		, vendorId(BGFX_PCI_ID_NONE)
 		, deviceId(0)
+		, debug(BX_ENABLED(BGFX_CONFIG_DEBUG) )
+		, profile(BX_ENABLED(BGFX_CONFIG_DEBUG_PIX) )
 		, callback(NULL)
 		, allocator(NULL)
 	{
@@ -2946,19 +2948,6 @@ error:
 		}
 
 		return false;
-	}
-
-	bool init(RendererType::Enum _type, uint16_t _vendorId, uint16_t _deviceId, CallbackI* _callback, bx::AllocatorI* _allocator)
-	{
-		Init in;
-
-		in.type      = _type;
-		in.vendorId  = _vendorId;
-		in.deviceId  = _deviceId;
-		in.callback  = _callback;
-		in.allocator = _allocator;
-
-		return init(in);
 	}
 
 	void shutdown()
@@ -3588,9 +3577,9 @@ error:
 		return s_ctx->getShaderUniforms(_handle, _uniforms, _max);
 	}
 
-	void setName(ShaderHandle _handle, const char* _name)
+	void setName(ShaderHandle _handle, const char* _name, int32_t _len)
 	{
-		s_ctx->setName(_handle, _name);
+		s_ctx->setName(_handle, bx::StringView(_name, _len) );
 	}
 
 	void destroy(ShaderHandle _handle)
@@ -3759,8 +3748,8 @@ error:
 			break;
 		}
 
-		_width  = bx::uint16_max(1, _width);
-		_height = bx::uint16_max(1, _height);
+		_width  = bx::max<uint16_t>(1, _width);
+		_height = bx::max<uint16_t>(1, _height);
 	}
 
 	static TextureHandle createTexture2D(BackbufferRatio::Enum _ratio, uint16_t _width, uint16_t _height, bool _hasMips, uint16_t _numLayers, TextureFormat::Enum _format, uint32_t _flags, const Memory* _mem)
@@ -3781,7 +3770,7 @@ error:
 		}
 
 		const uint8_t numMips = calcNumMips(_hasMips, _width, _height);
-		_numLayers = bx::uint16_max(_numLayers, 1);
+		_numLayers = bx::max<uint16_t>(_numLayers, 1);
 
 		if (BX_ENABLED(BGFX_CONFIG_DEBUG)
 		&&  NULL != _mem)
@@ -3876,7 +3865,7 @@ error:
 		BX_CHECK(err.isOk(), "%s", err.getMessage().getPtr() );
 
 		const uint8_t numMips = calcNumMips(_hasMips, _size, _size);
-		_numLayers = bx::uint16_max(_numLayers, 1);
+		_numLayers = bx::max<uint16_t>(_numLayers, 1);
 
 		if (BX_ENABLED(BGFX_CONFIG_DEBUG)
 		&&  NULL != _mem)
@@ -3911,9 +3900,9 @@ error:
 		return s_ctx->createTexture(mem, _flags, 0, NULL, BackbufferRatio::Count, NULL != _mem);
 	}
 
-	void setName(TextureHandle _handle, const char* _name)
+	void setName(TextureHandle _handle, const char* _name, int32_t _len)
 	{
-		s_ctx->setName(_handle, _name);
+		s_ctx->setName(_handle, bx::StringView(_name, _len) );
 	}
 
 	void* getDirectAccessPtr(TextureHandle _handle)
@@ -4029,8 +4018,8 @@ error:
 			);
 		return s_ctx->createFrameBuffer(
 			  _nwh
-			, bx::uint16_max(_width, 1)
-			, bx::uint16_max(_height, 1)
+			, bx::max<uint16_t>(_width, 1)
+			, bx::max<uint16_t>(_height, 1)
 			, _depthFormat
 			);
 	}
@@ -4833,7 +4822,7 @@ BGFX_C_API bool bgfx_init(const bgfx_init_t* _init)
 	}
 
 	union { const bgfx_init_t* c; const bgfx::Init* cpp; } in;
-	in.c = _init;
+	in.c = &init;
 
 	return bgfx::init(*in.cpp);
 }
@@ -5066,10 +5055,10 @@ BGFX_C_API uint16_t bgfx_get_shader_uniforms(bgfx_shader_handle_t _handle, bgfx_
 	return bgfx::getShaderUniforms(handle.cpp, (bgfx::UniformHandle*)_uniforms, _max);
 }
 
-BGFX_C_API void bgfx_set_shader_name(bgfx_shader_handle_t _handle, const char* _name)
+BGFX_C_API void bgfx_set_shader_name(bgfx_shader_handle_t _handle, const char* _name, int32_t _len)
 {
 	union { bgfx_shader_handle_t c; bgfx::ShaderHandle cpp; } handle = { _handle };
-	bgfx::setName(handle.cpp, _name);
+	bgfx::setName(handle.cpp, _name, _len);
 }
 
 BGFX_C_API void bgfx_destroy_shader(bgfx_shader_handle_t _handle)
@@ -5172,10 +5161,10 @@ BGFX_C_API uint32_t bgfx_read_texture(bgfx_texture_handle_t _handle, void* _data
 	return bgfx::readTexture(handle.cpp, _data, _mip);
 }
 
-BGFX_C_API void bgfx_set_texture_name(bgfx_texture_handle_t _handle, const char* _name)
+BGFX_C_API void bgfx_set_texture_name(bgfx_texture_handle_t _handle, const char* _name, int32_t _len)
 {
 	union { bgfx_texture_handle_t c; bgfx::TextureHandle cpp; } handle = { _handle };
-	bgfx::setName(handle.cpp, _name);
+	bgfx::setName(handle.cpp, _name, _len);
 }
 
 BGFX_C_API void* bgfx_get_direct_access_ptr(bgfx_texture_handle_t _handle)
