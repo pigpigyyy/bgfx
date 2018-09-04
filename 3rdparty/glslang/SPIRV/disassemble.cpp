@@ -46,6 +46,7 @@
 
 #include "disassemble.h"
 #include "doc.h"
+#include "SpvTools.h"
 
 namespace spv {
     extern "C" {
