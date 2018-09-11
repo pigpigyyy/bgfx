@@ -204,6 +204,7 @@ project "glslang"
 			"-Wno-return-type",
 			"-Wno-shadow",
 			"-Wno-sign-compare",
+			"-Wno-switch",
 			"-Wno-undef",
 			"-Wno-unknown-pragmas",
 			"-Wno-unused-function",
@@ -334,6 +335,7 @@ project "fcpp"
 		"NWORK=65536",
 		"NBUFF=65536",
 		"OLD_PREPROCESSOR=0",
+--		"MSG_PREFIX=\"Preprocessor: \"",
 	}
 
 	files {
