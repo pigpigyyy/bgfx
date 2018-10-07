@@ -485,6 +485,7 @@ typedef struct bgfx_attachment_s
     bgfx_texture_handle_t handle;
     uint16_t mip;
     uint16_t layer;
+    uint8_t  resolve;
 
 } bgfx_attachment_t;
 
@@ -567,7 +568,7 @@ typedef struct bgfx_callback_interface_s
 /**/
 typedef struct bgfx_callback_vtbl_s
 {
-    void (*fatal)(bgfx_callback_interface_t* _this, bgfx_fatal_t _code, const char* _str);
+    void (*fatal)(bgfx_callback_interface_t* _this, const char* _filePath, uint16_t _line, bgfx_fatal_t _code, const char* _str);
     void (*trace_vargs)(bgfx_callback_interface_t* _this, const char* _filePath, uint16_t _line, const char* _format, va_list _argList);
     void (*profiler_begin)(bgfx_callback_interface_t* _this, const char* _name, uint32_t _abgr, const char* _filePath, uint16_t _line);
     void (*profiler_begin_literal)(bgfx_callback_interface_t* _this, const char* _name, uint32_t _abgr, const char* _filePath, uint16_t _line);
@@ -603,6 +604,8 @@ typedef struct bgfx_resolution_s
     uint32_t width;
     uint32_t height;
     uint32_t reset;
+    uint8_t  numBackBuffers;
+    uint8_t  maxFrameLatency;
 
 } bgfx_resolution_t;
 
@@ -991,6 +994,9 @@ BGFX_C_API void bgfx_set_instance_data_from_vertex_buffer(bgfx_vertex_buffer_han
 
 /**/
 BGFX_C_API void bgfx_set_instance_data_from_dynamic_vertex_buffer(bgfx_dynamic_vertex_buffer_handle_t _handle, uint32_t _startVertex, uint32_t _num);
+
+/**/
+BGFX_C_API void bgfx_set_instance_count(uint32_t _numInstances);
 
 /**/
 BGFX_C_API void bgfx_set_texture(uint8_t _stage, bgfx_uniform_handle_t _sampler, bgfx_texture_handle_t _handle, uint32_t _flags);

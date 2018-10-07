@@ -422,6 +422,8 @@ namespace bgfx
 		/// It's not safe to continue (Exluding _code `Fatal::DebugCheck`),
 		/// inform the user and terminate the application.
 		///
+		/// @param[in] _filePath File path where fatal message was generated.
+		/// @param[in] _line Line where fatal message was generated.
 		/// @param[in] _code Fatal error code.
 		/// @param[in] _str More information about error.
 		///
@@ -430,7 +432,12 @@ namespace bgfx
 		///
 		/// @attention C99 equivalent is `bgfx_callback_vtbl.fatal`.
 		///
-		virtual void fatal(Fatal::Enum _code, const char* _str) = 0;
+		virtual void fatal(
+			  const char* _filePath
+			, uint16_t _line
+			, Fatal::Enum _code
+			, const char* _str
+			) = 0;
 
 		/// Print debug message.
 		///
@@ -605,6 +612,8 @@ namespace bgfx
 		uint32_t width;             //!< Backbuffer width.
 		uint32_t height;            //!< Backbuffer height.
 		uint32_t reset;	            //!< Reset parameters.
+		uint8_t  numBackBuffers;    //!< Number of back buffers.
+		uint8_t  maxFrameLatency;   //!< Maximum frame latency.
 	};
 
 	/// Initialization parameters used by `bgfx::init`.
@@ -636,7 +645,8 @@ namespace bgfx
 		bool debug;   //!< Enable device for debuging.
 		bool profile; //!< Enable device for profiling.
 
-		Resolution resolution; //!< Backbuffer resolution and reset parameters.
+		/// Backbuffer resolution and reset parameters. See: `bgfx::Resolution`.
+		Resolution resolution;
 
 		struct Limits
 		{
@@ -666,7 +676,9 @@ namespace bgfx
 	///
 	typedef void (*ReleaseFn)(void* _ptr, void* _userData);
 
-	/// Memory obtained by calling `bgfx::alloc`, `bgfx::copy`, or `bgfx::makeRef`.
+	/// Memory must be obtained by calling `bgfx::alloc`, `bgfx::copy`, or `bgfx::makeRef`.
+	///
+	/// @attention It is illegal to create this structure on stack and pass it to any bgfx API.
 	///
 	/// @attention C99 equivalent is `bgfx_memory_t`.
 	///
@@ -839,6 +851,7 @@ namespace bgfx
 		TextureHandle handle; //!< Texture handle.
 		uint16_t mip;         //!< Mip level.
 		uint16_t layer;       //!< Cubemap side or depth layer/slice.
+		uint8_t  resolve;     //!< Resolve flags. See: `BGFX_RESOLVE_*`
 	};
 
 	/// Transform data.
@@ -1300,6 +1313,16 @@ namespace bgfx
 			, uint32_t _start
 			, uint32_t _num
 			);
+
+		/// Set number of instances for auto generated instances use in conjuction
+		/// with gl_InstanceID.
+		///
+		/// @param[in] _numInstances Number of instances.
+		///
+		/// @attention Availability depends on: `BGFX_CAPS_VERTEX_ID`.
+		/// @attention C99 equivalent is `bgfx_set_instance_count`.
+		///
+		void setInstanceCount(uint32_t _numInstances);
 
 		/// Set texture stage for draw primitive.
 		///
@@ -1889,7 +1912,9 @@ namespace bgfx
 
 	/// Begin submitting draw calls from thread.
 	///
-	Encoder* begin();
+	/// @param[in] _forThread Explicitly request an encoder for a worker thread.
+	///
+	Encoder* begin(bool _forThread = false);
 
 	/// End submitting draw calls from thread.
 	///
@@ -2491,7 +2516,7 @@ namespace bgfx
 
 	/// Calculate amount of memory required for texture.
 	///
-	/// @param[out] _info Resulting texture info structure.
+	/// @param[out] _info Resulting texture info structure. See: `TextureInfo`.
 	/// @param[in] _width Width.
 	/// @param[in] _height Height.
 	/// @param[in] _depth Depth dimension of volume texture.
@@ -2876,7 +2901,7 @@ namespace bgfx
 	/// mip level.
 	///
 	/// @param[in] _num Number of texture attachments.
-	/// @param[in] _attachment Attachment texture info. See: `Attachment`.
+	/// @param[in] _attachment Attachment texture info. See: `bgfx::Attachment`.
 	/// @param[in] _destroyTextures If true, textures will be destroyed when
 	///   frame buffer is destroyed.
 	///
@@ -3630,6 +3655,16 @@ namespace bgfx
 		, uint32_t _start
 		, uint32_t _num
 		);
+
+	/// Set number of instances for auto generated instances use in conjuction
+	/// with gl_InstanceID.
+	///
+	/// @param[in] _numInstances Number of instances.
+	///
+	/// @attention Availability depends on: `BGFX_CAPS_VERTEX_ID`.
+	/// @attention C99 equivalent is `bgfx_set_instance_count`.
+	///
+	void setInstanceCount(uint32_t _numInstances);
 
 	/// Set texture stage for draw primitive.
 	///

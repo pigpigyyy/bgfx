@@ -106,6 +106,21 @@ struct DebugMeshVertex
 
 bgfx::VertexDecl DebugMeshVertex::ms_decl;
 
+static DebugShapeVertex s_quadVertices[4] =
+{
+	{-1.0f, 0.0f,  1.0f, { 0, 0, 0, 0 } },
+	{ 1.0f, 0.0f,  1.0f, { 0, 0, 0, 0 } },
+	{-1.0f, 0.0f, -1.0f, { 0, 0, 0, 0 } },
+	{ 1.0f, 0.0f, -1.0f, { 0, 0, 0, 0 } },
+
+};
+
+static const uint16_t s_quadIndices[6] =
+{
+	0, 1, 2,
+	1, 3, 2,
+};
+
 static DebugShapeVertex s_cubeVertices[8] =
 {
 	{-1.0f,  1.0f,  1.0f, { 0, 0, 0, 0 } },
@@ -549,6 +564,8 @@ struct Mesh
 		Capsule2,
 		Capsule3,
 
+		Quad,
+
 		Cube,
 
 		Count,
@@ -895,6 +912,15 @@ struct DebugDrawShared
 			startIndex  += numIndices + numLineListIndices;
 		}
 
+		m_mesh[Mesh::Quad].m_startVertex = startVertex;
+		m_mesh[Mesh::Quad].m_numVertices = BX_COUNTOF(s_quadVertices);
+		m_mesh[Mesh::Quad].m_startIndex[0] = startIndex;
+		m_mesh[Mesh::Quad].m_numIndices[0] = BX_COUNTOF(s_quadIndices);
+		m_mesh[Mesh::Quad].m_startIndex[1] = 0;
+		m_mesh[Mesh::Quad].m_numIndices[1] = 0;
+		startVertex += BX_COUNTOF(s_quadVertices);
+		startIndex  += BX_COUNTOF(s_quadIndices);
+
 		m_mesh[Mesh::Cube].m_startVertex = startVertex;
 		m_mesh[Mesh::Cube].m_numVertices = BX_COUNTOF(s_cubeVertices);
 		m_mesh[Mesh::Cube].m_startIndex[0] = startIndex;
@@ -907,7 +933,7 @@ struct DebugDrawShared
 		const bgfx::Memory* vb = bgfx::alloc(startVertex*stride);
 		const bgfx::Memory* ib = bgfx::alloc(startIndex*sizeof(uint16_t) );
 
-		for (uint32_t mesh = Mesh::Sphere0; mesh < Mesh::Cube; ++mesh)
+		for (uint32_t mesh = Mesh::Sphere0; mesh < Mesh::Quad; ++mesh)
 		{
 			Mesh::Enum id = Mesh::Enum(mesh);
 			bx::memCopy(&vb->data[m_mesh[id].m_startVertex * stride]
@@ -923,6 +949,16 @@ struct DebugDrawShared
 			BX_FREE(m_allocator, vertices[id]);
 			BX_FREE(m_allocator, indices[id]);
 		}
+
+		bx::memCopy(&vb->data[m_mesh[Mesh::Quad].m_startVertex * stride]
+			, s_quadVertices
+			, sizeof(s_quadVertices)
+			);
+
+		bx::memCopy(&ib->data[m_mesh[Mesh::Quad].m_startIndex[0] * sizeof(uint16_t)]
+			, s_quadIndices
+			, sizeof(s_quadIndices)
+			);
 
 		bx::memCopy(&vb->data[m_mesh[Mesh::Cube].m_startVertex * stride]
 			, s_cubeVertices
@@ -1793,49 +1829,63 @@ struct DebugDrawEncoderImpl
 	void drawQuad(const float* _normal, const float* _center, float _size)
 	{
 		const Attrib& attrib = m_attrib[m_stack];
+		if (attrib.m_wireframe)
+		{
+			float udir[3];
+			float vdir[3];
 
-		float udir[3];
-		float vdir[3];
+			bx::vec3TangentFrame(_normal, udir, vdir, attrib.m_spin);
 
-		bx::vec3TangentFrame(_normal, udir, vdir, attrib.m_spin);
+			const float halfExtent = _size*0.5f;
 
-		const float halfExtent = _size*0.5f;
+			float umin[3];
+			bx::vec3Mul(umin, udir, -halfExtent);
 
-		float umin[3];
-		bx::vec3Mul(umin, udir, -halfExtent);
+			float umax[3];
+			bx::vec3Mul(umax, udir,  halfExtent);
 
-		float umax[3];
-		bx::vec3Mul(umax, udir,  halfExtent);
+			float vmin[3];
+			bx::vec3Mul(vmin, vdir, -halfExtent);
 
-		float vmin[3];
-		bx::vec3Mul(vmin, vdir, -halfExtent);
+			float vmax[3];
+			bx::vec3Mul(vmax, vdir,  halfExtent);
 
-		float vmax[3];
-		bx::vec3Mul(vmax, vdir,  halfExtent);
+			float pt[3];
+			float tmp[3];
+			bx::vec3Add(tmp, umin, vmin);
+			bx::vec3Add(pt, _center, tmp);
+			moveTo(pt);
 
-		float pt[3];
-		float tmp[3];
-		bx::vec3Add(tmp, umin, vmin);
-		bx::vec3Add(pt, _center, tmp);
-		moveTo(pt);
+			bx::vec3Add(tmp, umax, vmin);
+			bx::vec3Add(pt, _center, tmp);
+			lineTo(pt);
 
-		bx::vec3Add(tmp, umax, vmin);
-		bx::vec3Add(pt, _center, tmp);
-		lineTo(pt);
+			bx::vec3Add(tmp, umax, vmax);
+			bx::vec3Add(pt, _center, tmp);
+			lineTo(pt);
 
-		bx::vec3Add(tmp, umax, vmax);
-		bx::vec3Add(pt, _center, tmp);
-		lineTo(pt);
+			bx::vec3Add(tmp, umin, vmax);
+			bx::vec3Add(pt, _center, tmp);
+			lineTo(pt);
 
-		bx::vec3Add(tmp, umin, vmax);
-		bx::vec3Add(pt, _center, tmp);
-		lineTo(pt);
-
-		close();
+			close();
+		}
+		else
+		{
+			float mtx[16];
+			bx::mtxFromNormal(mtx, _normal, _size*0.5f, _center, attrib.m_spin);
+			draw(Mesh::Quad, mtx, 1, false);
+		}
 	}
 
 	void drawQuad(SpriteHandle _handle, const float* _normal, const float* _center, float _size)
 	{
+		if (!isValid(_handle) )
+		{
+			drawQuad(_normal, _center, _size);
+			return;
+		}
+
 		if (m_posQuad == BX_COUNTOF(m_cacheQuad) )
 		{
 			flushQuad();
@@ -2385,216 +2435,6 @@ void ddDestroy(GeometryHandle _handle)
 	s_dds.destroy(_handle);
 }
 
-void ddBegin(uint16_t _viewId, bool _depthTestLess, bgfx::Encoder* _encoder)
-{
-	s_dde.begin(_viewId, _depthTestLess, _encoder);
-}
-
-void ddEnd()
-{
-	s_dde.end();
-}
-
-void ddPush()
-{
-	s_dde.push();
-}
-
-void ddPop()
-{
-	s_dde.pop();
-}
-
-void ddSetDepthTestLess(bool _depthTestLess)
-{
-	s_dde.setDepthTestLess(_depthTestLess);
-}
-
-void ddSetState(bool _depthTest, bool _depthWrite, bool _clockwise)
-{
-	s_dde.setState(_depthTest, _depthWrite, _clockwise);
-}
-
-void ddSetColor(uint32_t _abgr)
-{
-	s_dde.setColor(_abgr);
-}
-
-void ddSetLod(uint8_t _lod)
-{
-	s_dde.setLod(_lod);
-}
-
-void ddSetWireframe(bool _wireframe)
-{
-	s_dde.setWireframe(_wireframe);
-}
-
-void ddSetStipple(bool _stipple, float _scale, float _offset)
-{
-	s_dde.setStipple(_stipple, _scale, _offset);
-}
-
-void ddSetSpin(float _spin)
-{
-	s_dde.setSpin(_spin);
-}
-
-void ddSetTransform(const void* _mtx)
-{
-	s_dde.setTransform(_mtx);
-}
-
-void ddSetTranslate(float _x, float _y, float _z)
-{
-	s_dde.setTranslate(_x, _y, _z);
-}
-
-void ddMoveTo(float _x, float _y, float _z)
-{
-	s_dde.moveTo(_x, _y, _z);
-}
-
-void ddMoveTo(const void* _pos)
-{
-	s_dde.moveTo(_pos);
-}
-
-void ddLineTo(float _x, float _y, float _z)
-{
-	s_dde.lineTo(_x, _y, _z);
-}
-
-void ddLineTo(const void* _pos)
-{
-	s_dde.lineTo(_pos);
-}
-
-void ddClose()
-{
-	s_dde.close();
-}
-
-void ddDraw(const Aabb& _aabb)
-{
-	s_dde.draw(_aabb);
-}
-
-void ddDraw(const Cylinder& _cylinder)
-{
-	s_dde.draw(_cylinder, false);
-}
-
-void ddDraw(const Capsule& _capsule)
-{
-	s_dde.draw(*( (const Cylinder*)&_capsule), true);
-}
-
-void ddDraw(const Disk& _disk)
-{
-	s_dde.draw(_disk);
-}
-
-void ddDraw(const Obb& _obb)
-{
-	s_dde.draw(_obb);
-}
-
-void ddDraw(const Sphere& _sphere)
-{
-	s_dde.draw(_sphere);
-}
-
-void ddDraw(const Cone& _cone)
-{
-	s_dde.drawCone(_cone.m_pos, _cone.m_end, _cone.m_radius);
-}
-
-void ddDraw(GeometryHandle _handle)
-{
-	s_dde.draw(_handle);
-}
-
-void ddDrawLineList(uint32_t _numVertices, const DdVertex* _vertices, uint32_t _numIndices, const uint16_t* _indices)
-{
-	s_dde.draw(true, _numVertices, _vertices, _numIndices, _indices);
-}
-
-void ddDrawTriList(uint32_t _numVertices, const DdVertex* _vertices, uint32_t _numIndices, const uint16_t* _indices)
-{
-	s_dde.draw(false, _numVertices, _vertices, _numIndices, _indices);
-}
-
-void ddDrawFrustum(const void* _viewProj)
-{
-	s_dde.drawFrustum(_viewProj);
-}
-
-void ddDrawArc(Axis::Enum _axis, float _x, float _y, float _z, float _radius, float _degrees)
-{
-	s_dde.drawArc(_axis, _x, _y, _z, _radius, _degrees);
-}
-
-void ddDrawCircle(const void* _normal, const void* _center, float _radius, float _weight)
-{
-	s_dde.drawCircle(_normal, _center, _radius, _weight);
-}
-
-void ddDrawCircle(Axis::Enum _axis, float _x, float _y, float _z, float _radius, float _weight)
-{
-	s_dde.drawCircle(_axis, _x, _y, _z, _radius, _weight);
-}
-
-void ddDrawQuad(const float* _normal, const float* _center, float _size)
-{
-	s_dde.drawQuad(_normal, _center, _size);
-}
-
-void ddDrawQuad(SpriteHandle _handle, const float* _normal, const float* _center, float _size)
-{
-	s_dde.drawQuad(_handle, _normal, _center, _size);
-}
-
-void ddDrawQuad(bgfx::TextureHandle _handle, const float* _normal, const float* _center, float _size)
-{
-	s_dde.drawQuad(_handle, _normal, _center, _size);
-}
-
-void ddDrawCone(const void* _from, const void* _to, float _radius)
-{
-	s_dde.drawCone(_from, _to, _radius);
-}
-
-void ddDrawCylinder(const void* _from, const void* _to, float _radius)
-{
-	s_dde.drawCylinder(_from, _to, _radius, false);
-}
-
-void ddDrawCapsule(const void* _from, const void* _to, float _radius)
-{
-	s_dde.drawCylinder(_from, _to, _radius, true);
-}
-
-void ddDrawAxis(float _x, float _y, float _z, float _len, Axis::Enum _hightlight, float _thickness)
-{
-	s_dde.drawAxis(_x, _y, _z, _len, _hightlight, _thickness);
-}
-
-void ddDrawGrid(const void* _normal, const void* _center, uint32_t _size, float _step)
-{
-	s_dde.drawGrid(_normal, _center, _size, _step);
-}
-
-void ddDrawGrid(Axis::Enum _axis, const void* _center, uint32_t _size, float _step)
-{
-	s_dde.drawGrid(_axis, _center, _size, _step);
-}
-
-void ddDrawOrb(float _x, float _y, float _z, float _radius, Axis::Enum _hightlight)
-{
-	s_dde.drawOrb(_x, _y, _z, _radius, _hightlight);
-}
-
 #define DEBUG_DRAW_ENCODER(_func) reinterpret_cast<DebugDrawEncoderImpl*>(this)->_func
 
 DebugDrawEncoder::DebugDrawEncoder()
@@ -2670,6 +2510,16 @@ void DebugDrawEncoder::setTransform(const void* _mtx)
 void DebugDrawEncoder::setTranslate(float _x, float _y, float _z)
 {
 	DEBUG_DRAW_ENCODER(setTranslate(_x, _y, _z) );
+}
+
+void DebugDrawEncoder::pushTransform(const void* _mtx)
+{
+	DEBUG_DRAW_ENCODER(pushTransform(_mtx, 1) );
+}
+
+void DebugDrawEncoder::popTransform()
+{
+	DEBUG_DRAW_ENCODER(popTransform() );
 }
 
 void DebugDrawEncoder::moveTo(float _x, float _y, float _z)

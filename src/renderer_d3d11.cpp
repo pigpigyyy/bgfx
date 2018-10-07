@@ -967,13 +967,15 @@ namespace bgfx { namespace d3d11
 				{
 					HRESULT hr = S_OK;
 
+					m_swapEffect =
 #if BX_PLATFORM_WINDOWS
-					m_swapEffect      = DXGI_SWAP_EFFECT_FLIP_DISCARD;
-					m_swapBufferCount = 2;
+						DXGI_SWAP_EFFECT_FLIP_DISCARD
 #else
-					m_swapEffect      = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;
-					m_swapBufferCount = 2;
+						DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL
 #endif // !BX_PLATFORM_WINDOWS
+						;
+
+					m_swapBufferCount = bx::clamp<uint8_t>(_init.resolution.numBackBuffers, 2, BGFX_CONFIG_MAX_BACK_BUFFERS);
 
 					bx::memSet(&m_scd, 0, sizeof(m_scd) );
 					m_scd.width  = _init.resolution.width;
@@ -989,12 +991,14 @@ namespace bgfx { namespace d3d11
 						? DXGI_SCALING_NONE
 						: DXGI_SCALING_STRETCH
 						;
-					m_scd.swapEffect  = m_swapEffect;
-					m_scd.alphaMode   = DXGI_ALPHA_MODE_IGNORE;
-					m_scd.flags       = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
-					m_scd.nwh         = g_platformData.nwh;
-					m_scd.ndt         = g_platformData.ndt;
-					m_scd.windowed    = true;
+					m_scd.swapEffect = m_swapEffect;
+					m_scd.alphaMode  = DXGI_ALPHA_MODE_IGNORE;
+					m_scd.flags      = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
+
+					m_scd.maxFrameLatency = bx::min<uint8_t>(_init.resolution.maxFrameLatency, 3);
+					m_scd.nwh             = g_platformData.nwh;
+					m_scd.ndt             = g_platformData.ndt;
+					m_scd.windowed        = true;
 
 					m_msaaRt = NULL;
 
@@ -1512,6 +1516,8 @@ namespace bgfx { namespace d3d11
 				postReset();
 			}
 
+			m_nvapi.initAftermath(m_device, m_deviceCtx);
+
 			g_internalData.context = m_device;
 			return true;
 
@@ -1520,7 +1526,7 @@ namespace bgfx { namespace d3d11
 			{
 			case ErrorState::LoadedDXGI:
 				DX_RELEASE(m_annotation, 1);
-				DX_RELEASE_WARNONLY(m_infoQueue, 0);
+				DX_RELEASE_W(m_infoQueue, 0);
 				DX_RELEASE(m_msaaRt, 0);
 				DX_RELEASE(m_swapChain, 0);
 				DX_RELEASE(m_deviceCtx, 0);
@@ -1607,7 +1613,7 @@ namespace bgfx { namespace d3d11
 			}
 
 			DX_RELEASE(m_annotation, 1);
-			DX_RELEASE_WARNONLY(m_infoQueue, 0);
+			DX_RELEASE_W(m_infoQueue, 0);
 			DX_RELEASE(m_msaaRt, 0);
 			DX_RELEASE(m_swapChain, 0);
 			DX_RELEASE(m_deviceCtx, 0);
@@ -1768,7 +1774,7 @@ namespace bgfx { namespace d3d11
 			m_deviceCtx->Unmap(texture.m_ptr, _mip);
 		}
 
-		void resizeTexture(TextureHandle _handle, uint16_t _width, uint16_t _height, uint8_t _numMips) override
+		void resizeTexture(TextureHandle _handle, uint16_t _width, uint16_t _height, uint8_t _numMips, uint16_t _numLayers) override
 		{
 			TextureD3D11& texture = m_textures[_handle.idx];
 
@@ -1783,7 +1789,7 @@ namespace bgfx { namespace d3d11
 			tc.m_width     = _width;
 			tc.m_height    = _height;
 			tc.m_depth     = 0;
-			tc.m_numLayers = 1;
+			tc.m_numLayers = _numLayers;
 			tc.m_numMips   = _numMips;
 			tc.m_format    = TextureFormat::Enum(texture.m_requestedFormat);
 			tc.m_cubeMap   = false;
@@ -4500,7 +4506,7 @@ namespace bgfx { namespace d3d11
 									;
 	}
 
-	void TextureD3D11::resolve() const
+	void TextureD3D11::resolve(uint8_t _resolve) const
 	{
 		ID3D11DeviceContext* deviceCtx = s_renderD3D11->m_deviceCtx;
 
@@ -4512,7 +4518,8 @@ namespace bgfx { namespace d3d11
 
 		const bool renderTarget = 0 != (m_flags&BGFX_TEXTURE_RT_MASK);
 		if (renderTarget
-		&&  1 < m_numMips)
+		&&  1 < m_numMips
+		&&  0 != (_resolve & BGFX_RESOLVE_AUTO_GEN_MIPS) )
 		{
 			deviceCtx->GenerateMips(m_srv);
 		}
@@ -4811,11 +4818,11 @@ namespace bgfx { namespace d3d11
 		{
 			for (uint32_t ii = 0; ii < m_numTh; ++ii)
 			{
-				TextureHandle handle = m_attachment[ii].handle;
-				if (isValid(handle) )
+				const Attachment& at = m_attachment[ii];
+				if (isValid(at.handle) )
 				{
-					const TextureD3D11& texture = s_renderD3D11->m_textures[handle.idx];
-					texture.resolve();
+					const TextureD3D11& texture = s_renderD3D11->m_textures[at.handle.idx];
+					texture.resolve(at.resolve);
 				}
 			}
 		}
