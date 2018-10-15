@@ -2352,26 +2352,25 @@ namespace bgfx { namespace mtl
 		uint32_t magic;
 		bx::read(&reader, magic);
 
-		switch (magic)
+		uint32_t hashIn;
+		bx::read(&reader, hashIn);
+
+		uint32_t hashOut;
+
+		if (isShaderVerLess(magic, 6) )
 		{
-			case BGFX_CHUNK_MAGIC_CSH:
-			case BGFX_CHUNK_MAGIC_FSH:
-			case BGFX_CHUNK_MAGIC_VSH:
-				break;
-
-			default:
-				BGFX_FATAL(false, Fatal::InvalidShader, "Unknown shader format %x.", magic);
-				break;
+			hashOut = hashIn;
 		}
-
-		uint32_t iohash;
-		bx::read(&reader, iohash);
+		else
+		{
+			bx::read(&reader, hashOut);
+		}
 
 		uint16_t count;
 		bx::read(&reader, count);
 
 		BX_TRACE("%s Shader consts %d"
-			, BGFX_CHUNK_MAGIC_FSH == magic ? "Fragment" : BGFX_CHUNK_MAGIC_VSH == magic ? "Vertex" : "Compute"
+			, getShaderTypeName(magic)
 			, count
 			);
 
@@ -2414,12 +2413,13 @@ namespace bgfx { namespace mtl
 		BGFX_FATAL(NULL != m_function
 			, bgfx::Fatal::InvalidShader
 			, "Failed to create %s shader."
-			, BGFX_CHUNK_MAGIC_FSH == magic ? "Fragment" : BGFX_CHUNK_MAGIC_VSH == magic ? "Vertex" : "Compute"
+			, getShaderTypeName(magic)
 			);
 
 		bx::HashMurmur2A murmur;
 		murmur.begin();
-		murmur.add(iohash);
+		murmur.add(hashIn);
+		murmur.add(hashOut);
 		murmur.add(code, shaderSize);
 //		murmur.add(numAttrs);
 //		murmur.add(m_attrMask, numAttrs);
@@ -4103,6 +4103,7 @@ namespace bgfx { namespace mtl
 		perfStats.gpuTimerFreq  = m_gpuTimer.m_frequency;
 		perfStats.numDraw       = statsKeyType[0];
 		perfStats.numCompute    = statsKeyType[1];
+		perfStats.numBlit       = _render->m_numBlitItems;
 		perfStats.maxGpuLatency = maxGpuLatency;
 		bx::memCopy(perfStats.numPrims, statsNumPrimsRendered, sizeof(perfStats.numPrims) );
 		perfStats.gpuMemoryMax  = -INT64_MAX;

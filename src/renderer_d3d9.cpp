@@ -2394,21 +2394,21 @@ namespace bgfx { namespace d3d9
 		uint32_t magic;
 		bx::read(&reader, magic);
 
-		switch (magic)
+		const bool fragment = isShaderType(magic, 'F');
+
+		uint32_t hashIn;
+		bx::read(&reader, hashIn);
+
+		uint32_t hashOut;
+
+		if (isShaderVerLess(magic, 6) )
 		{
-		case BGFX_CHUNK_MAGIC_FSH:
-		case BGFX_CHUNK_MAGIC_VSH:
-			break;
-
-		default:
-			BGFX_FATAL(false, Fatal::InvalidShader, "Unknown shader format %x.", magic);
-			break;
+			hashOut = hashIn;
 		}
-
-		bool fragment = BGFX_CHUNK_MAGIC_FSH == magic;
-
-		uint32_t iohash;
-		bx::read(&reader, iohash);
+		else
+		{
+			bx::read(&reader, hashOut);
+		}
 
 		uint16_t count;
 		bx::read(&reader, count);
@@ -4400,6 +4400,7 @@ namespace bgfx { namespace d3d9
 		perfStats.gpuTimerFreq  = result.m_frequency;
 		perfStats.numDraw       = statsKeyType[0];
 		perfStats.numCompute    = statsKeyType[1];
+		perfStats.numBlit       = _render->m_numBlitItems;
 		perfStats.maxGpuLatency = maxGpuLatency;
 		bx::memCopy(perfStats.numPrims, statsNumPrimsRendered, sizeof(perfStats.numPrims) );
 		m_nvapi.getMemoryInfo(perfStats.gpuMemoryUsed, perfStats.gpuMemoryMax);
