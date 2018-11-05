@@ -472,6 +472,7 @@ namespace bgfx
 	bool isGraphicsDebuggerPresent();
 	void release(const Memory* _mem);
 	const char* getAttribName(Attrib::Enum _attr);
+	const char* getAttribNameShort(Attrib::Enum _attr);
 	void getTextureSizeFromRatio(BackbufferRatio::Enum _ratio, uint16_t& _width, uint16_t& _height);
 	TextureFormat::Enum getViableTextureFormat(const bimg::ImageContainer& _imageContainer);
 	const char* getName(TextureFormat::Enum _fmt);
@@ -1164,6 +1165,15 @@ namespace bgfx
 
 		uint16_t m_item;
 		ViewId   m_view;
+	};
+
+	BX_ALIGN_DECL_16(struct) Srt
+	{
+		float rotate[4];
+		float translate[3];
+		float pad0;
+		float scale[3];
+		float pad1;
 	};
 
 	BX_ALIGN_DECL_16(struct) Matrix4

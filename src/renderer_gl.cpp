@@ -1073,10 +1073,10 @@ namespace bgfx { namespace gl
 			while (pos < end)
 			{
 				uint32_t len;
-				const char* space = bx::strFind(pos, ' ');
-				if (NULL != space)
+				bx::StringView space = bx::strFind(pos, ' ');
+				if (!space.isEmpty() )
 				{
-					len = bx::uint32_min(sizeof(name), (uint32_t)(space - pos) );
+					len = bx::uint32_min(sizeof(name), (uint32_t)(space.getPtr() - pos) );
 				}
 				else
 				{
@@ -1571,8 +1571,7 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 			? tfi.m_internalFmtSrgb
 			: tfi.m_internalFmt
 			;
-		if (GL_ZERO == internalFmt
-		||  !tfi.m_supported)
+		if (GL_ZERO == internalFmt)
 		{
 			return false;
 		}
@@ -1855,8 +1854,8 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 				;
 
 			if (BX_ENABLED(BGFX_CONFIG_RENDERER_OPENGLES >= 31)
-			&&  0    == bx::strCmp(m_vendor, "Imagination Technologies")
-			&&  NULL != bx::strFind(m_version, "(SDK 3.5@3510720)") )
+			&&  0 == bx::strCmp(m_vendor, "Imagination Technologies")
+			&&  !bx::strFind(m_version, "(SDK 3.5@3510720)").isEmpty() )
 			{
 				// Skip initializing extensions that are broken in emulator.
 				s_extension[Extension::ARB_program_interface_query     ].m_initialize =
@@ -1864,8 +1863,8 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 			}
 
 			if (BX_ENABLED(BGFX_CONFIG_RENDERER_OPENGLES)
-			&&  0    == bx::strCmp(m_vendor, "Imagination Technologies")
-			&&  NULL != bx::strFind(m_version, "1.8@905891") )
+			&&  0 == bx::strCmp(m_vendor, "Imagination Technologies")
+			&&  !bx::strFind(m_version, "1.8@905891").isEmpty() )
 			{
 				m_workaround.m_detachShader = false;
 			}
@@ -1883,10 +1882,10 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 					while (pos < end)
 					{
 						uint32_t len;
-						const char* space = bx::strFind(pos, ' ');
-						if (NULL != space)
+						const bx::StringView space = bx::strFind(pos, ' ');
+						if (!space.isEmpty() )
 						{
-							len = bx::uint32_min(sizeof(name), (uint32_t)(space - pos) );
+							len = bx::uint32_min(sizeof(name), (uint32_t)(space.getPtr() - pos) );
 						}
 						else
 						{
@@ -4279,19 +4278,14 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 
 			num = bx::uint32_max(num, 1);
 
-			int offset = 0;
-			char* array = const_cast<char*>(bx::strFind(name, '[') );
-			if (NULL != array)
+			int32_t offset = 0;
+			const bx::StringView array = bx::strFind(name, '[');
+			if (!array.isEmpty() )
 			{
+				name[array.getPtr() - name] = '\0';
 				BX_TRACE("--- %s", name);
-				*array = '\0';
-				array++;
-				char* end = const_cast<char*>(bx::strFind(array, ']') );
-				if (NULL != end)
-				{ // Some devices (Amazon Fire) might not return terminating brace.
-					*end = '\0';
-					offset = atoi(array);
-				}
+				const bx::StringView end = bx::strFind(array.getPtr()+1, ']');
+				bx::fromString(&offset, bx::StringView(array.getPtr()+1, end.getPtr() ) );
 			}
 
 			switch (gltype)
@@ -4624,8 +4618,7 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 					, _depth
 					) );
 			}
-
-			if (computeWrite)
+			else if (computeWrite)
 			{
 				if (_target == GL_TEXTURE_3D)
 				{
@@ -5223,23 +5216,6 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 		}
 	}
 
-	void writeString(bx::WriterI* _writer, const char* _str)
-	{
-		bx::write(_writer, _str, (int32_t)bx::strLen(_str) );
-	}
-
-	void writeStringf(bx::WriterI* _writer, const char* _format, ...)
-	{
-		char temp[512];
-
-		va_list argList;
-		va_start(argList, _format);
-		int len = bx::vsnprintf(temp, BX_COUNTOF(temp), _format, argList);
-		va_end(argList);
-
-		bx::write(_writer, temp, len);
-	}
-
 	void strins(char* _str, const char* _insert)
 	{
 		size_t len = bx::strLen(_insert);
@@ -5318,49 +5294,45 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 		m_id = glCreateShader(m_type);
 		BX_WARN(0 != m_id, "Failed to create shader.");
 
-		const char* code = (const char*)reader.getDataPtr();
+		bx::StringView code( (const char*)reader.getDataPtr(), shaderSize);
 
 		if (0 != m_id)
 		{
 			if (GL_COMPUTE_SHADER != m_type
 			&&  0 != bx::strCmp(code, "#version 430", 12) )
 			{
-				int32_t codeLen = (int32_t)bx::strLen(code);
-				int32_t tempLen = codeLen + (4<<10);
+				int32_t tempLen = code.getLength() + (4<<10);
 				char* temp = (char*)alloca(tempLen);
 				bx::StaticMemoryBlockWriter writer(temp, tempLen);
 
 				if (BX_ENABLED(BGFX_CONFIG_RENDERER_OPENGLES)
 				&&  BX_ENABLED(BGFX_CONFIG_RENDERER_OPENGLES < 30) )
 				{
-					writeString(&writer,
-						"#define centroid\n"
-						"#define flat\n"
-						"#define noperspective\n"
-						"#define smooth\n"
+					bx::write(&writer
+						, "#define centroid\n"
+						  "#define flat\n"
+						  "#define noperspective\n"
+						  "#define smooth\n"
 						);
 
 					bool usesDerivatives = s_extension[Extension::OES_standard_derivatives].m_supported
-						&& bx::findIdentifierMatch(code, s_OES_standard_derivatives)
+						&& !bx::findIdentifierMatch(code, s_OES_standard_derivatives).isEmpty()
 						;
 
-					bool usesFragData  = !!bx::findIdentifierMatch(code, "gl_FragData");
+					const bool usesFragData         = !bx::findIdentifierMatch(code, "gl_FragData").isEmpty();
+					const bool usesFragDepth        = !bx::findIdentifierMatch(code, "gl_FragDepth").isEmpty();
+					const bool usesShadowSamplers   = !bx::findIdentifierMatch(code, s_EXT_shadow_samplers).isEmpty();
+					const bool usesTextureLod       = !bx::findIdentifierMatch(code, s_EXT_shader_texture_lod).isEmpty();
+					const bool usesFragmentOrdering = !bx::findIdentifierMatch(code, "beginFragmentShaderOrdering").isEmpty();
 
-					bool usesFragDepth = !!bx::findIdentifierMatch(code, "gl_FragDepth");
-
-					bool usesShadowSamplers = !!bx::findIdentifierMatch(code, s_EXT_shadow_samplers);
-
-					bool usesTexture3D = s_extension[Extension::OES_texture_3D].m_supported
-						&& bx::findIdentifierMatch(code, s_texture3D)
+					const bool usesTexture3D = true
+						&& s_extension[Extension::OES_texture_3D].m_supported
+						&& !bx::findIdentifierMatch(code, s_texture3D).isEmpty()
 						;
-
-					bool usesTextureLod = !!bx::findIdentifierMatch(code, s_EXT_shader_texture_lod);
-
-					bool usesFragmentOrdering = !!bx::findIdentifierMatch(code, "beginFragmentShaderOrdering");
 
 					if (usesDerivatives)
 					{
-						writeString(&writer, "#extension GL_OES_standard_derivatives : enable\n");
+						bx::write(&writer, "#extension GL_OES_standard_derivatives : enable\n");
 					}
 
 					if (usesFragData)
@@ -5369,9 +5341,7 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 							||  s_extension[Extension::WEBGL_draw_buffers].m_supported
 							, "EXT_draw_buffers is used but not supported by GLES2 driver."
 							);
-						writeString(&writer
-							, "#extension GL_EXT_draw_buffers : enable\n"
-							);
+						bx::write(&writer, "#extension GL_EXT_draw_buffers : enable\n");
 					}
 
 					bool insertFragDepth = false;
@@ -5380,7 +5350,7 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 						BX_WARN(s_extension[Extension::EXT_frag_depth].m_supported, "EXT_frag_depth is used but not supported by GLES2 driver.");
 						if (s_extension[Extension::EXT_frag_depth].m_supported)
 						{
-							writeString(&writer
+							bx::write(&writer
 								, "#extension GL_EXT_frag_depth : enable\n"
 								  "#define bgfx_FragDepth gl_FragDepthEXT\n"
 								);
@@ -5389,7 +5359,7 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 							bx::snprintf(str, BX_COUNTOF(str), "%s float gl_FragDepthEXT;\n"
 								, s_extension[Extension::OES_fragment_precision_high].m_supported ? "highp" : "mediump"
 								);
-							writeString(&writer, str);
+							bx::write(&writer, str);
 						}
 						else
 						{
@@ -5401,7 +5371,7 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 					{
 						if (s_renderGL->m_shadowSamplersSupport)
 						{
-							writeString(&writer
+							bx::write(&writer
 								, "#extension GL_EXT_shadow_samplers : enable\n"
 								  "#define shadow2D shadow2DEXT\n"
 								  "#define shadow2DProj shadow2DProjEXT\n"
@@ -5409,7 +5379,7 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 						}
 						else
 						{
-							writeString(&writer
+							bx::write(&writer
 								, "#define sampler2DShadow sampler2D\n"
 								  "#define shadow2D(_sampler, _coord) step(_coord.z, texture2D(_sampler, _coord.xy).x)\n"
 								  "#define shadow2DProj(_sampler, _coord) step(_coord.z/_coord.w, texture2DProj(_sampler, _coord).x)\n"
@@ -5419,7 +5389,7 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 
 					if (usesTexture3D)
 					{
-						writeString(&writer, "#extension GL_OES_texture_3D : enable\n");
+						bx::write(&writer, "#extension GL_OES_texture_3D : enable\n");
 					}
 
 					if (usesTextureLod)
@@ -5431,33 +5401,33 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 
 						if (s_extension[Extension::ARB_shader_texture_lod].m_supported)
 						{
-							writeString(&writer
+							bx::write(&writer
 								, "#extension GL_ARB_shader_texture_lod : enable\n"
-								  "#define texture2DLod texture2DLodARB\n"
-								  "#define texture2DProjLod texture2DProjLodARB\n"
-								  "#define textureCubeLod textureCubeLodARB\n"
-								  "#define texture2DGrad texture2DGradARB\n"
+								  "#define texture2DLod      texture2DLodARB\n"
+								  "#define texture2DProjLod  texture2DProjLodARB\n"
+								  "#define textureCubeLod    textureCubeLodARB\n"
+								  "#define texture2DGrad     texture2DGradARB\n"
 								  "#define texture2DProjGrad texture2DProjGradARB\n"
-								  "#define textureCubeGrad textureCubeGradARB\n"
+								  "#define textureCubeGrad   textureCubeGradARB\n"
 								);
 						}
 						else
 						{
 							if(s_extension[Extension::EXT_shader_texture_lod].m_supported)
 							{
-								writeString(&writer
-								, "#extension GL_EXT_shader_texture_lod : enable\n"
-								  "#define texture2DLod texture2DLodEXT\n"
-								  "#define texture2DProjLod texture2DProjLodEXT\n"
-								  "#define textureCubeLod textureCubeLodEXT\n"
-								);
+								bx::write(&writer
+									, "#extension GL_EXT_shader_texture_lod : enable\n"
+									  "#define texture2DLod     texture2DLodEXT\n"
+									  "#define texture2DProjLod texture2DProjLodEXT\n"
+									  "#define textureCubeLod   textureCubeLodEXT\n"
+									);
 							}
 							else
 							{
-								writeString(&writer
+								bx::write(&writer
 									, "#define texture2DLod(_sampler, _coord, _level) texture2D(_sampler, _coord)\n"
-										"#define texture2DProjLod(_sampler, _coord, _level) texture2DProj(_sampler, _coord)\n"
-										"#define textureCubeLod(_sampler, _coord, _level) textureCube(_sampler, _coord)\n"
+									  "#define texture2DProjLod(_sampler, _coord, _level) texture2DProj(_sampler, _coord)\n"
+									  "#define textureCubeLod(_sampler, _coord, _level) textureCube(_sampler, _coord)\n"
 									);
 							}
 						}
@@ -5467,42 +5437,47 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 					{
 						if (s_extension[Extension::INTEL_fragment_shader_ordering].m_supported)
 						{
-							writeString(&writer, "#extension GL_INTEL_fragment_shader_ordering : enable\n");
+							bx::write(&writer, "#extension GL_INTEL_fragment_shader_ordering : enable\n");
 						}
 						else
 						{
-							writeString(&writer, "#define beginFragmentShaderOrdering()\n");
+							bx::write(&writer, "#define beginFragmentShaderOrdering()\n");
 						}
 					}
 
-					writeStringf(&writer, "precision %s float;\n"
-							, m_type == GL_FRAGMENT_SHADER ? "mediump" : "highp"
-							);
+					bx::writePrintf(&writer, "precision %s float;\n"
+						, m_type == GL_FRAGMENT_SHADER ? "mediump" : "highp"
+						);
 
-					bx::write(&writer, code, codeLen);
+					bx::write(&writer, code);
 					bx::write(&writer, '\0');
 
 					if (insertFragDepth)
 					{
-						const char* entry = bx::strFind(temp, "void main ()");
-						if (NULL != entry)
+						bx::StringView shader(temp);
+						bx::StringView entry = bx::strFind(shader, "void main ()");
+						if (!entry.isEmpty() )
 						{
-							char* brace = const_cast<char*>(bx::strFind(entry, "{") );
-							if (NULL != brace)
+							entry.set(entry.getTerm(), shader.getTerm() );
+							bx::StringView brace = bx::strFind(entry, "{");
+							if (!brace.isEmpty() )
 							{
-								const char* end = bx::strmb(brace, '{', '}');
-								if (NULL != end)
+								bx::StringView block = bx::strFindBlock(bx::StringView(brace.getPtr(), shader.getTerm() ), '{', '}');
+								if (!block.isEmpty() )
 								{
-									strins(brace+1, "\n  float bgfx_FragDepth = 0.0;\n");
+									strins(const_cast<char*>(brace.getPtr()+1), "\n  float bgfx_FragDepth = 0.0;\n");
 								}
 							}
 						}
 					}
 
 					// Replace all instances of gl_FragDepth with bgfx_FragDepth.
-					for (const char* fragDepth = bx::findIdentifierMatch(temp, "gl_FragDepth"); NULL != fragDepth; fragDepth = bx::findIdentifierMatch(fragDepth, "gl_FragDepth") )
+					for (bx::StringView fragDepth = bx::findIdentifierMatch(temp, "gl_FragDepth")
+						; !fragDepth.isEmpty()
+						; fragDepth = bx::findIdentifierMatch(fragDepth, "gl_FragDepth")
+						)
 					{
-						char* insert = const_cast<char*>(fragDepth);
+						char* insert = const_cast<char*>(fragDepth.getPtr() );
 						strins(insert, "bg");
 						bx::memCopy(insert + 2, "fx", 2);
 					}
@@ -5512,18 +5487,18 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 				{
 					const bool usesTextureLod = true
 						&& s_extension[Extension::ARB_shader_texture_lod].m_supported
-						&& bx::findIdentifierMatch(code, s_ARB_shader_texture_lod)
+						&& !bx::findIdentifierMatch(code, s_ARB_shader_texture_lod).isEmpty()
 						;
-					const bool usesGpuShader4   = !!bx::findIdentifierMatch(code, s_EXT_gpu_shader4);
-					const bool usesGpuShader5   = !!bx::findIdentifierMatch(code, s_ARB_gpu_shader5);
-					const bool usesIUsamplers   = !!bx::findIdentifierMatch(code, s_uisamplers);
-					const bool usesUint         = !!bx::findIdentifierMatch(code, s_uint);
-					const bool usesTexelFetch   = !!bx::findIdentifierMatch(code, s_texelFetch);
-					const bool usesTextureArray = !!bx::findIdentifierMatch(code, s_textureArray);
-					const bool usesTexture3D    = !!bx::findIdentifierMatch(code, s_texture3D);
-					const bool usesTextureMS    = !!bx::findIdentifierMatch(code, s_ARB_texture_multisample);
-					const bool usesPacking      = !!bx::findIdentifierMatch(code, s_ARB_shading_language_packing);
-					const bool usesInterpQ      = !!bx::findIdentifierMatch(code, s_intepolationQualifier);
+					const bool usesGpuShader4   = !bx::findIdentifierMatch(code, s_EXT_gpu_shader4).isEmpty();
+					const bool usesGpuShader5   = !bx::findIdentifierMatch(code, s_ARB_gpu_shader5).isEmpty();
+					const bool usesIUsamplers   = !bx::findIdentifierMatch(code, s_uisamplers).isEmpty();
+					const bool usesUint         = !bx::findIdentifierMatch(code, s_uint).isEmpty();
+					const bool usesTexelFetch   = !bx::findIdentifierMatch(code, s_texelFetch).isEmpty();
+					const bool usesTextureArray = !bx::findIdentifierMatch(code, s_textureArray).isEmpty();
+					const bool usesTexture3D    = !bx::findIdentifierMatch(code, s_texture3D).isEmpty();
+					const bool usesTextureMS    = !bx::findIdentifierMatch(code, s_ARB_texture_multisample).isEmpty();
+					const bool usesPacking      = !bx::findIdentifierMatch(code, s_ARB_shading_language_packing).isEmpty();
+					const bool usesInterpQ      = !bx::findIdentifierMatch(code, s_intepolationQualifier).isEmpty();
 
 					uint32_t version = BX_ENABLED(BX_PLATFORM_OSX) ? 120
 						:  usesTextureArray
@@ -5539,67 +5514,67 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 
 					if (0 != version)
 					{
-						writeStringf(&writer, "#version %d\n", version);
+						bx::writePrintf(&writer, "#version %d\n", version);
 					}
 
 					if (usesTextureLod)
 					{
 						if (m_type == GL_FRAGMENT_SHADER)
 						{
-							writeString(&writer
+							bx::write(&writer
 								, "#extension GL_ARB_shader_texture_lod : enable\n"
-								  "#define texture2DGrad texture2DGradARB\n"
+								  "#define texture2DGrad     texture2DGradARB\n"
 								  "#define texture2DProjGrad texture2DProjGradARB\n"
-								  "#define textureCubeGrad textureCubeGradARB\n"
+								  "#define textureCubeGrad   textureCubeGradARB\n"
 								);
 						}
 					}
 
 					if (usesGpuShader4)
 					{
-						writeString(&writer, "#extension GL_EXT_gpu_shader4 : enable\n");
+						bx::write(&writer, "#extension GL_EXT_gpu_shader4 : enable\n");
 					}
 
 					if (usesGpuShader5)
 					{
-						writeString(&writer, "#extension GL_ARB_gpu_shader5 : enable\n");
+						bx::write(&writer, "#extension GL_ARB_gpu_shader5 : enable\n");
 					}
 
 					if (usesPacking)
 					{
-						writeString(&writer, "#extension GL_ARB_shading_language_packing : enable\n");
+						bx::write(&writer, "#extension GL_ARB_shading_language_packing : enable\n");
 					}
 
 					if (usesTextureMS)
 					{
-						writeString(&writer, "#extension GL_ARB_texture_multisample : enable\n");
+						bx::write(&writer, "#extension GL_ARB_texture_multisample : enable\n");
 					}
 
 					if (usesTextureArray)
 					{
-						writeString(&writer, "#extension GL_EXT_texture_array : enable\n");
+						bx::write(&writer, "#extension GL_EXT_texture_array : enable\n");
 
 						if (BX_ENABLED(BX_PLATFORM_OSX) )
 						{
-							writeString(&writer, "#define texture2DArrayLodEXT texture2DArray\n");
+							bx::write(&writer, "#define texture2DArrayLodEXT texture2DArray\n");
 						}
 						else
 						{
-							writeString(&writer, "#define texture2DArrayLodEXT texture2DArrayLod\n");
+							bx::write(&writer, "#define texture2DArrayLodEXT texture2DArrayLod\n");
 						}
 					}
 
 					if (usesTexture3D)
 					{
-						writeString(&writer, "#define texture3DEXT texture3D\n");
+						bx::write(&writer, "#define texture3DEXT texture3D\n");
 
 						if (BX_ENABLED(BX_PLATFORM_OSX) )
 						{
-							writeString(&writer, "#define texture3DLodEXT texture3D\n");
+							bx::write(&writer, "#define texture3DLodEXT texture3D\n");
 						}
 						else
 						{
-							writeString(&writer, "#define texture3DLodEXT texture3DLod\n");
+							bx::write(&writer, "#define texture3DLodEXT texture3DLod\n");
 						}
 					}
 
@@ -5607,23 +5582,23 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 					{
 						if (m_type == GL_FRAGMENT_SHADER)
 						{
-							writeString(&writer, "#define varying in\n");
+							bx::write(&writer, "#define varying in\n");
 						}
 						else
 						{
-							writeString(&writer, "#define attribute in\n");
-							writeString(&writer, "#define varying out\n");
+							bx::write(&writer, "#define attribute in\n");
+							bx::write(&writer, "#define varying out\n");
 						}
 
 						uint32_t fragData = 0;
 
-						if (!!bx::findIdentifierMatch(code, "gl_FragData") )
+						if (!bx::findIdentifierMatch(code, "gl_FragData").isEmpty() )
 						{
 							for (uint32_t ii = 0, num = g_caps.limits.maxFBAttachments; ii < num; ++ii)
 							{
 								char tmpFragData[16];
 								bx::snprintf(tmpFragData, BX_COUNTOF(tmpFragData), "gl_FragData[%d]", ii);
-								fragData = bx::uint32_max(fragData, NULL == bx::strFind(code, tmpFragData) ? 0 : ii+1);
+								fragData = bx::uint32_max(fragData, bx::strFind(code, tmpFragData).isEmpty() ? 0 : ii+1);
 							}
 
 							BGFX_FATAL(0 != fragData, Fatal::InvalidShader, "Unable to find and patch gl_FragData!");
@@ -5631,29 +5606,31 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 
 						if (0 != fragData)
 						{
-							writeStringf(&writer, "out vec4 bgfx_FragData[%d];\n", fragData);
-							writeString(&writer, "#define gl_FragData bgfx_FragData\n");
+							bx::writePrintf(&writer, "out vec4 bgfx_FragData[%d];\n", fragData);
+							bx::write(&writer, "#define gl_FragData bgfx_FragData\n");
 						}
 						else
 						{
-							writeString(&writer, "out vec4 bgfx_FragColor;\n");
-							writeString(&writer, "#define gl_FragColor bgfx_FragColor\n");
+							bx::write(&writer, "out vec4 bgfx_FragColor;\n");
+							bx::write(&writer, "#define gl_FragColor bgfx_FragColor\n");
 						}
 					}
 					else
 					{
 						if (m_type == GL_FRAGMENT_SHADER)
 						{
-							writeString(&writer, "#define in varying\n");
+							bx::write(&writer, "#define in varying\n");
 						}
 						else
 						{
-							writeString(&writer, "#define in attribute\n");
-							writeString(&writer, "#define out varying\n");
+							bx::write(&writer
+								, "#define in attribute\n"
+								  "#define out varying\n"
+								);
 						}
 					}
 
-					writeString(&writer,
+					bx::write(&writer,
 						"#define lowp\n"
 						"#define mediump\n"
 						"#define highp\n"
@@ -5661,7 +5638,7 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 
 					if (!usesInterpQ)
 					{
-						writeString(&writer,
+						bx::write(&writer,
 							"#define centroid\n"
 							"#define flat\n"
 							"#define noperspective\n"
@@ -5669,7 +5646,7 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 							);
 					}
 
-					bx::write(&writer, code, codeLen);
+					bx::write(&writer, code);
 					bx::write(&writer, '\0');
 				}
 				else if (BX_ENABLED(BGFX_CONFIG_RENDERER_OPENGL   >= 31)
@@ -5677,7 +5654,7 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 				{
 					if (BX_ENABLED(BGFX_CONFIG_RENDERER_OPENGLES >= 30) )
 					{
-						writeStringf(&writer
+						bx::writePrintf(&writer
 							, "#version 300 es\n"
 							  "precision %s float;\n"
 							, m_type == GL_FRAGMENT_SHADER ? "mediump" : "highp"
@@ -5685,98 +5662,106 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 					}
 					else
 					{
-						writeString(&writer, "#version 140\n");
+						bx::write(&writer, "#version 140\n");
 					}
 
-					writeString(&writer, "#define texture2DLod    textureLod\n");
-					writeString(&writer, "#define texture3DLod    textureLod\n");
-					writeString(&writer, "#define textureCubeLod  textureLod\n");
-					writeString(&writer, "#define texture2DGrad   textureGrad\n");
-					writeString(&writer, "#define texture3DGrad   textureGrad\n");
-					writeString(&writer, "#define textureCubeGrad textureGrad\n");
+					bx::write(&writer
+						, "#define texture2DLod    textureLod\n"
+						  "#define texture3DLod    textureLod\n"
+						  "#define textureCubeLod  textureLod\n"
+						  "#define texture2DGrad   textureGrad\n"
+						  "#define texture3DGrad   textureGrad\n"
+						  "#define textureCubeGrad textureGrad\n"
+						);
 
 					if (m_type == GL_FRAGMENT_SHADER)
 					{
-						writeString(&writer, "#define varying in\n");
-						writeString(&writer, "#define texture2D texture\n");
-						writeString(&writer, "#define texture2DProj textureProj\n");
+						bx::write(&writer
+							, "#define varying       in\n"
+							  "#define texture2D     texture\n"
+							  "#define texture2DProj textureProj\n"
+							);
 
 						if (BX_ENABLED(BGFX_CONFIG_RENDERER_OPENGL) )
 						{
-							writeString(&writer, "#define shadow2D(_sampler, _coord) vec2(textureProj(_sampler, vec4(_coord, 1.0) ) )\n");
-							writeString(&writer, "#define shadow2DProj(_sampler, _coord) vec2(textureProj(_sampler, _coord) ) )\n");
+							bx::write(&writer, "#define shadow2D(_sampler, _coord) vec2(textureProj(_sampler, vec4(_coord, 1.0) ) )\n");
+							bx::write(&writer, "#define shadow2DProj(_sampler, _coord) vec2(textureProj(_sampler, _coord) ) )\n");
 						}
 						else
 						{
-							writeString(&writer, "#define shadow2D(_sampler, _coord) (textureProj(_sampler, vec4(_coord, 1.0) ) )\n");
-							writeString(&writer, "#define shadow2DProj(_sampler, _coord) (textureProj(_sampler, _coord) ) )\n");
+							bx::write(&writer, "#define shadow2D(_sampler, _coord) (textureProj(_sampler, vec4(_coord, 1.0) ) )\n");
+							bx::write(&writer, "#define shadow2DProj(_sampler, _coord) (textureProj(_sampler, _coord) ) )\n");
 						}
 
-						writeString(&writer, "#define texture3D texture\n");
-						writeString(&writer, "#define textureCube texture\n");
+						bx::write(&writer, "#define texture3D   texture\n");
+						bx::write(&writer, "#define textureCube texture\n");
 
 						uint32_t fragData = 0;
 
-						if (!!bx::findIdentifierMatch(code, "gl_FragData") )
+						if (!bx::findIdentifierMatch(code, "gl_FragData").isEmpty() )
 						{
 							for (uint32_t ii = 0, num = g_caps.limits.maxFBAttachments; ii < num; ++ii)
 							{
 								char tmpFragData[16];
 								bx::snprintf(tmpFragData, BX_COUNTOF(tmpFragData), "gl_FragData[%d]", ii);
-								fragData = bx::uint32_max(fragData, NULL == bx::strFind(code, tmpFragData) ? 0 : ii+1);
+								fragData = bx::max(fragData, bx::strFind(code, tmpFragData).isEmpty() ? 0 : ii+1);
 							}
 
 							BGFX_FATAL(0 != fragData, Fatal::InvalidShader, "Unable to find and patch gl_FragData!");
 						}
 
-						if (!!bx::findIdentifierMatch(code, "beginFragmentShaderOrdering") )
+						if (!bx::findIdentifierMatch(code, "beginFragmentShaderOrdering").isEmpty() )
 						{
 							if (s_extension[Extension::INTEL_fragment_shader_ordering].m_supported)
 							{
-								writeString(&writer, "#extension GL_INTEL_fragment_shader_ordering : enable\n");
+								bx::write(&writer, "#extension GL_INTEL_fragment_shader_ordering : enable\n");
 							}
 							else
 							{
-								writeString(&writer, "#define beginFragmentShaderOrdering()\n");
+								bx::write(&writer, "#define beginFragmentShaderOrdering()\n");
 							}
 						}
 
-						if (!!bx::findIdentifierMatch(code, s_ARB_texture_multisample) )
+						if (!bx::findIdentifierMatch(code, s_ARB_texture_multisample).isEmpty() )
 						{
-							writeString(&writer, "#extension GL_ARB_texture_multisample : enable\n");
+							bx::write(&writer, "#extension GL_ARB_texture_multisample : enable\n");
 						}
 
 						if (0 != fragData)
 						{
-							writeStringf(&writer, "out vec4 bgfx_FragData[%d];\n", fragData);
-							writeString(&writer, "#define gl_FragData bgfx_FragData\n");
+							bx::writePrintf(&writer, "out vec4 bgfx_FragData[%d];\n", fragData);
+							bx::write(&writer, "#define gl_FragData bgfx_FragData\n");
 						}
 						else
 						{
-							writeString(&writer, "out vec4 bgfx_FragColor;\n");
-							writeString(&writer, "#define gl_FragColor bgfx_FragColor\n");
+							bx::write(&writer
+								, "out vec4 bgfx_FragColor;\n"
+								  "#define gl_FragColor bgfx_FragColor\n"
+								);
 						}
 					}
 					else
 					{
-						writeString(&writer, "#define attribute in\n");
-						writeString(&writer, "#define varying out\n");
+						bx::write(&writer
+							, "#define attribute in\n"
+							  "#define varying   out\n"
+							);
 					}
 
 					if (!BX_ENABLED(BGFX_CONFIG_RENDERER_OPENGLES >= 30) )
 					{
-						writeString(&writer
-								, "#define lowp\n"
-								  "#define mediump\n"
-								  "#define highp\n"
-								);
+						bx::write(&writer
+							, "#define lowp\n"
+							  "#define mediump\n"
+							  "#define highp\n"
+							);
 					}
 
-					bx::write(&writer, code, codeLen);
+					bx::write(&writer, code.getPtr(), code.getLength() );
 					bx::write(&writer, '\0');
 				}
 
-				code = temp;
+				code.set(temp);
 			}
 			else if (GL_COMPUTE_SHADER == m_type)
 			{
@@ -5785,15 +5770,17 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 				char* temp = (char*)alloca(tempLen);
 				bx::StaticMemoryBlockWriter writer(temp, tempLen);
 
-				writeString(&writer, "#version 430\n");
-				writeString(&writer, "#define texture2DLod    textureLod\n");
-				writeString(&writer, "#define texture3DLod    textureLod\n");
-				writeString(&writer, "#define textureCubeLod  textureLod\n");
-				writeString(&writer, "#define texture2DGrad   textureGrad\n");
-				writeString(&writer, "#define texture3DGrad   textureGrad\n");
-				writeString(&writer, "#define textureCubeGrad textureGrad\n");
+				bx::write(&writer
+					, "#version 430\n"
+					  "#define texture2DLod    textureLod\n"
+					  "#define texture3DLod    textureLod\n"
+					  "#define textureCubeLod  textureLod\n"
+					  "#define texture2DGrad   textureGrad\n"
+					  "#define texture3DGrad   textureGrad\n"
+					  "#define textureCubeGrad textureGrad\n"
+					);
 
-				bx::write(&writer, code+bx::strLen("#version 430"), codeLen);
+				bx::write(&writer, code.getPtr()+bx::strLen("#version 430"), codeLen);
 				bx::write(&writer, '\0');
 
 				code = temp;
@@ -5817,10 +5804,10 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 					if (err.isOk() )
 					{
 						str[len] = '\0';
-						const char* eol = bx::streol(str);
-						if (eol != str)
+						bx::StringView eol = bx::strFindEol(str);
+						if (eol.getPtr() != str)
 						{
-							*const_cast<char*>(eol) = '\0';
+							*const_cast<char*>(eol.getPtr() ) = '\0';
 						}
 						BX_TRACE("%3d %s", line, str);
 					}
@@ -5922,11 +5909,27 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 
 					if (0 != texture.m_rbo)
 					{
-						GL_CHECK(glFramebufferRenderbuffer(GL_FRAMEBUFFER
-							, attachment
-							, GL_RENDERBUFFER
-							, texture.m_rbo
-							) );
+#if !(BGFX_CONFIG_RENDERER_OPENGL >= 30 || BGFX_CONFIG_RENDERER_OPENGLES >= 30)
+						if (GL_DEPTH_STENCIL_ATTACHMENT == attachment)
+						{
+							GL_CHECK(glFramebufferRenderbuffer(GL_FRAMEBUFFER
+								, GL_DEPTH_ATTACHMENT
+								, GL_RENDERBUFFER
+								, texture.m_rbo
+								) );
+							GL_CHECK(glFramebufferRenderbuffer(GL_FRAMEBUFFER
+								, GL_STENCIL_ATTACHMENT
+								, GL_RENDERBUFFER
+								, texture.m_rbo
+								) );
+						}
+						else
+#endif
+							GL_CHECK(glFramebufferRenderbuffer(GL_FRAMEBUFFER
+								, attachment
+								, GL_RENDERBUFFER
+								, texture.m_rbo
+								) );
 					}
 					else
 					{

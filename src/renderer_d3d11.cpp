@@ -3036,12 +3036,26 @@ namespace bgfx { namespace d3d11
 				switch (texture.m_type)
 				{
 				case TextureD3D11::Texture2D:
-					desc.ViewDimension = msaaSample
-						? D3D11_SRV_DIMENSION_TEXTURE2DMS
-						: D3D11_SRV_DIMENSION_TEXTURE2D
-						;
-					desc.Texture2D.MostDetailedMip = _mip;
-					desc.Texture2D.MipLevels       = 1;
+					if (1 < texture.m_depth)
+					{
+						desc.ViewDimension = msaaSample
+							? D3D11_SRV_DIMENSION_TEXTURE2DMSARRAY
+							: D3D11_SRV_DIMENSION_TEXTURE2DARRAY
+							;
+						desc.Texture2DArray.MostDetailedMip = _mip;
+						desc.Texture2DArray.MipLevels = 1;
+						desc.Texture2DArray.FirstArraySlice = 0;
+						desc.Texture2DArray.ArraySize = texture.m_depth;
+					}
+					else
+					{
+						desc.ViewDimension = msaaSample
+							? D3D11_SRV_DIMENSION_TEXTURE2DMS
+							: D3D11_SRV_DIMENSION_TEXTURE2D
+							;
+						desc.Texture2D.MostDetailedMip = _mip;
+						desc.Texture2D.MipLevels = 1;
+					}
 					break;
 
 				case TextureD3D11::TextureCube:
@@ -4577,6 +4591,15 @@ namespace bgfx { namespace d3d11
 			, &m_swapChain
 			);
 		BGFX_FATAL(SUCCEEDED(hr), Fatal::UnableToInitialize, "Failed to create swap chain.");
+
+#if BX_PLATFORM_WINDOWS
+		DX_CHECK(s_renderD3D11->m_dxgi.m_factory->MakeWindowAssociation(
+			  (HWND)_nwh
+			, 0
+			| DXGI_MWA_NO_WINDOW_CHANGES
+			| DXGI_MWA_NO_ALT_ENTER
+			) );
+#endif // BX_PLATFORM_WINDOWS
 
 		ID3D11Resource* ptr;
 		DX_CHECK(m_swapChain->GetBuffer(0, IID_ID3D11Texture2D, (void**)&ptr) );
