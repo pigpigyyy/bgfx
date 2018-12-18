@@ -2,6 +2,8 @@
 // Copyright (C) 2002-2005  3Dlabs Inc. Ltd.
 // Copyright (C) 2016 LunarG, Inc.
 // Copyright (C) 2017 ARM Limited.
+// Copyright (C) 2015-2018 Google, Inc.
+//
 // All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
@@ -732,7 +734,7 @@ protected:
     bool specConstantPropagates(const TIntermTyped&, const TIntermTyped&);
     void performTextureUpgradeAndSamplerRemovalTransformation(TIntermNode* root);
     bool isConversionAllowed(TOperator op, TIntermTyped* node) const;
-    TIntermUnary* createConversion(TBasicType convertTo, TIntermTyped* node) const;
+    TIntermTyped* createConversion(TBasicType convertTo, TIntermTyped* node) const;
     std::tuple<TBasicType, TBasicType> getConversionDestinatonType(TBasicType type0, TBasicType type1, TOperator op) const;
     bool extensionRequested(const char *extension) const {return requestedExtensions.find(extension) != requestedExtensions.end();}
     static const char* getResourceName(TResourceType);

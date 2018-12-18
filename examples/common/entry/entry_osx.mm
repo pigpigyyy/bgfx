@@ -258,7 +258,6 @@ namespace entry
 			{
 				NSEventType eventType = [event type];
 
-				// TODO: Get correct window
 				NSWindow *window = [NSApp keyWindow];
 				WindowHandle handle = handleFromWindow(window);
 
@@ -460,10 +459,7 @@ namespace entry
 
 			while (!(m_exit = [dg applicationHasTerminated]) )
 			{
-				@autoreleasepool
-				{
-					bgfx::renderFrame();
-				}
+				bgfx::renderFrame();
 
 				while (dispatchEvent(peekEvent() ) )
 				{

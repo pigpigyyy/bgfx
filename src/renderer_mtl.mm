@@ -18,43 +18,6 @@
 
 #define UNIFORM_BUFFER_SIZE (8*1024*1024)
 
-/*
- // known metal shader generation issues:
-   03-raymarch: OSX10.11.3 nothing is visible ( depth/color swap in fragment output struct fixed this )
-   24-nbody: no generated compute shaders for metal
-
-Known issues(driver problems??):
-  OSX mac mini(late 2014), OSX10.11.3 : nanovg-rendering: color writemask off causes problem...
-  03-raymarch: OSX nothing is visible  ( depth/color order should be swapped in fragment output struct)
-  works fine with newer OSX
-  iPad mini 2,  iOS 8.1.1:  21-deferred: scissor not working properly
-                            26-occlusion: query doesn't work with two rendercommandencoders
-  Only on this device ( no problem on iPad Air 2 with iOS9.3.1)
-
-  TODOs:
- - support multiple vertex buffers: 34-mvs
-
- - framebufferMtl and TextureMtl resolve
-
- - FrameBufferMtl::postReset recreate framebuffer???
-
- renderpass load/resolve
- - capture with msaa: 07-callback
- - implement fb discard. problematic with multiple views that has same fb...
- - msaa color/depth/stencil is not saved. could have problem when we switch back to msaa framebuffer
- - refactor store/load actions to support msaa/discard/capture/readback etc...
-
- - finish savescreenshot with screenshotbegin/end
-
- - multithreading with multiple commandbuffer
-
- - compute and drawindirect: 24-nbody (needs compute shaders)
-
- INFO:
-  - 15-shadowmaps-simple (example needs modification mtxCrop znew = z * 0.5 + 0.5 is not needed ) could be hacked in shader too
-
- */
-
 namespace bgfx { namespace mtl
 {
 	static char s_viewName[BGFX_CONFIG_MAX_VIEWS][BGFX_CONFIG_MAX_VIEW_NAME];
@@ -425,6 +388,12 @@ namespace bgfx { namespace mtl
 
 			retain(m_device);
 			createFrameBuffer(m_fbh, g_platformData.nwh, 0, 0, TextureFormat::Unknown, TextureFormat::UnknownDepth);
+			
+			if ( NULL == m_mainFrameBuffer.m_swapChain->m_metalLayer )
+			{
+				release(m_device);
+				return false;
+			}
 
 			m_cmd.init(m_device);
 			BGFX_FATAL(NULL != m_cmd.m_commandQueue, Fatal::UnableToInitialize, "Unable to create Metal device.");
@@ -489,22 +458,23 @@ namespace bgfx { namespace mtl
 			m_screenshotBlitRenderPipelineState = m_device.newRenderPipelineStateWithDescriptor(m_renderPipelineDescriptor);
 
 			g_caps.supported |= (0
-				| BGFX_CAPS_TEXTURE_COMPARE_LEQUAL
-				| BGFX_CAPS_TEXTURE_COMPARE_ALL
+				| BGFX_CAPS_ALPHA_TO_COVERAGE
+				| BGFX_CAPS_BLEND_INDEPENDENT
+				| BGFX_CAPS_FRAGMENT_DEPTH
+				| BGFX_CAPS_INDEX32
+				| BGFX_CAPS_INSTANCING
+				| BGFX_CAPS_OCCLUSION_QUERY
+				| BGFX_CAPS_SWAP_CHAIN
+				| BGFX_CAPS_TEXTURE_2D_ARRAY
 				| BGFX_CAPS_TEXTURE_3D
+				| BGFX_CAPS_TEXTURE_BLIT
+				| BGFX_CAPS_TEXTURE_COMPARE_ALL
+				| BGFX_CAPS_TEXTURE_COMPARE_LEQUAL
+				| BGFX_CAPS_TEXTURE_READ_BACK
 				| BGFX_CAPS_VERTEX_ATTRIB_HALF
 				| BGFX_CAPS_VERTEX_ATTRIB_UINT10
-				| BGFX_CAPS_INSTANCING
-				| BGFX_CAPS_FRAGMENT_DEPTH
-				| BGFX_CAPS_BLEND_INDEPENDENT
-				| BGFX_CAPS_INDEX32
-				| BGFX_CAPS_TEXTURE_BLIT
-				| BGFX_CAPS_TEXTURE_READ_BACK
-				| BGFX_CAPS_OCCLUSION_QUERY
-				| BGFX_CAPS_ALPHA_TO_COVERAGE
-				| BGFX_CAPS_TEXTURE_2D_ARRAY
-				| BGFX_CAPS_SWAP_CHAIN
 				);
+
 			if (BX_ENABLED(BX_PLATFORM_IOS) )
 			{
 				if (iOSVersionEqualOrGreater("9.0.0") )
@@ -648,11 +618,18 @@ namespace bgfx { namespace mtl
 			m_gpuTimer.init();
 
 			g_internalData.context = m_device;
+
+#if BX_PLATFORM_OSX
+			m_pool = [[NSAutoreleasePool alloc] init];
+#endif
 			return true;
 		}
 
 		void shutdown()
 		{
+#if BX_PLATFORM_OSX
+			[m_pool release];
+#endif
 			m_occlusionQuery.postReset();
 			m_gpuTimer.shutdown();
 
@@ -1143,8 +1120,8 @@ namespace bgfx { namespace mtl
 			for (uint32_t ii = 0, num = m_numWindows; ii < num; ++ii)
 			{
 				FrameBufferMtl& frameBuffer = ii == 0 ? m_mainFrameBuffer : m_frameBuffers[m_windows[ii].idx];
-				if (NULL != frameBuffer.m_swapChain &&
-					frameBuffer.m_swapChain->m_drawable)
+				if (NULL != frameBuffer.m_swapChain
+				&&  frameBuffer.m_swapChain->m_drawable)
 				{
 					m_commandBuffer.presentDrawable(frameBuffer.m_swapChain->m_drawable);
 					MTL_RELEASE(frameBuffer.m_swapChain->m_drawable);
@@ -1153,6 +1130,11 @@ namespace bgfx { namespace mtl
 
 			m_cmd.kick(true);
 			m_commandBuffer = 0;
+
+#if BX_PLATFORM_OSX
+			[m_pool release];
+			m_pool = [[NSAutoreleasePool alloc] init];
+#endif
 		}
 
 		void updateResolution(const Resolution& _resolution)
@@ -1345,12 +1327,12 @@ namespace bgfx { namespace mtl
 				}
 
 #define CASE_IMPLEMENT_UNIFORM(_uniform, _dxsuffix, _type) \
-				case UniformType::_uniform: \
-				case UniformType::_uniform|BGFX_UNIFORM_FRAGMENTBIT: \
-				{ \
-					setShaderUniform(uint8_t(type), loc, data, num); \
-				} \
-				break;
+	case UniformType::_uniform:                            \
+	case UniformType::_uniform|BGFX_UNIFORM_FRAGMENTBIT:   \
+	{                                                      \
+		setShaderUniform(uint8_t(type), loc, data, num);   \
+	}                                                      \
+	break;
 
 				switch ( (uint32_t)type)
 				{
@@ -1378,8 +1360,8 @@ namespace bgfx { namespace mtl
 					}
 					break;
 
-					CASE_IMPLEMENT_UNIFORM(Int1,    I, int);
-					CASE_IMPLEMENT_UNIFORM(Vec4,   F, float);
+					CASE_IMPLEMENT_UNIFORM(Int1, I, int);
+					CASE_IMPLEMENT_UNIFORM(Vec4, F, float);
 					CASE_IMPLEMENT_UNIFORM(Mat4, F, float);
 
 				case UniformType::End:
@@ -1544,9 +1526,9 @@ namespace bgfx { namespace mtl
 					!isValid(_fbh) ?
 					m_mainFrameBuffer.m_swapChain :
 					m_frameBuffers[_fbh.idx].m_swapChain;
-				if (NULL != m_backBufferColorMSAA)
+				if (NULL != m_backBufferColorMsaa)
 				{
-					renderPassDescriptor.colorAttachments[0].texture = swapChain->m_backBufferColorMSAA;
+					renderPassDescriptor.colorAttachments[0].texture = swapChain->m_backBufferColorMsaa;
 					renderPassDescriptor.colorAttachments[0].resolveTexture = NULL != m_screenshotTarget
 						? m_screenshotTarget.m_obj
 						: swapChain->currentDrawable().texture
@@ -1570,11 +1552,11 @@ namespace bgfx { namespace mtl
 				for (uint32_t ii = 0; ii < frameBuffer.m_num; ++ii)
 				{
 					const TextureMtl& texture = m_textures[frameBuffer.m_colorHandle[ii].idx];
-					renderPassDescriptor.colorAttachments[ii].texture = texture.m_ptrMSAA
-						? texture.m_ptrMSAA
+					renderPassDescriptor.colorAttachments[ii].texture = texture.m_ptrMsaa
+						? texture.m_ptrMsaa
 						: texture.m_ptr
 						;
-					renderPassDescriptor.colorAttachments[ii].resolveTexture = texture.m_ptrMSAA
+					renderPassDescriptor.colorAttachments[ii].resolveTexture = texture.m_ptrMsaa
 						? texture.m_ptr.m_obj
 						: NULL
 						;
@@ -1583,8 +1565,8 @@ namespace bgfx { namespace mtl
 				if (isValid(frameBuffer.m_depthHandle) )
 				{
 					const TextureMtl& texture = m_textures[frameBuffer.m_depthHandle.idx];
-					renderPassDescriptor.depthAttachment.texture = texture.m_ptrMSAA
-						? texture.m_ptrMSAA
+					renderPassDescriptor.depthAttachment.texture = texture.m_ptrMsaa
+						? texture.m_ptrMsaa
 						: texture.m_ptr
 						;
 					renderPassDescriptor.stencilAttachment.texture = texture.m_ptrStencil;
@@ -1598,8 +1580,8 @@ namespace bgfx { namespace mtl
 						}
 						else
 						{
-							renderPassDescriptor.stencilAttachment.texture = texture.m_ptrMSAA
-								? texture.m_ptrMSAA
+							renderPassDescriptor.stencilAttachment.texture = texture.m_ptrMsaa
+								? texture.m_ptrMsaa
 								: texture.m_ptrStencil
 								;
 						}
@@ -1746,7 +1728,7 @@ namespace bgfx { namespace mtl
 						!isValid(_fbh) ?
 						s_renderMtl->m_mainFrameBuffer.m_swapChain :
 					s_renderMtl->m_frameBuffers[_fbh.idx].m_swapChain;
-					pd.sampleCount = NULL != swapChain->m_backBufferColorMSAA ? swapChain->m_backBufferColorMSAA.sampleCount() : 1;
+					pd.sampleCount = NULL != swapChain->m_backBufferColorMsaa ? swapChain->m_backBufferColorMsaa.sampleCount() : 1;
 					pd.colorAttachments[0].pixelFormat = swapChain->currentDrawable().texture.pixelFormat;
 					pd.depthAttachmentPixelFormat      = swapChain->m_backBufferDepth.m_obj.pixelFormat;
 					pd.stencilAttachmentPixelFormat    = swapChain->m_backBufferStencil.m_obj.pixelFormat;
@@ -1759,8 +1741,8 @@ namespace bgfx { namespace mtl
 					for (uint32_t ii = 0; ii < frameBuffer.m_num; ++ii)
 					{
 						const TextureMtl& texture = m_textures[frameBuffer.m_colorHandle[ii].idx];
-						pd.sampleCount = NULL != texture.m_ptrMSAA
-							? texture.m_ptrMSAA.sampleCount()
+						pd.sampleCount = NULL != texture.m_ptrMsaa
+							? texture.m_ptrMsaa.sampleCount()
 							: 1
 							;
 						pd.colorAttachments[ii].pixelFormat = texture.m_ptr.m_obj.pixelFormat;
@@ -2131,24 +2113,13 @@ namespace bgfx { namespace mtl
 			return m_blitCommandEncoder;
 		}
 
-		id<CAMetalDrawable> currentDrawable()
-		{
-			if (m_drawable == nil)
-			{
-				m_drawable = m_metalLayer.nextDrawable;
-				retain(m_drawable); // keep alive to be useable at 'flip'
-			}
-
-			return m_drawable;
-		}
-
 		Device            m_device;
 		OcclusionQueryMTL m_occlusionQuery;
 		TimerQueryMtl     m_gpuTimer;
 		CommandQueueMtl   m_cmd;
 
 		CAMetalLayer* m_metalLayer;
-		Texture       m_backBufferColorMSAA;
+		Texture       m_backBufferColorMsaa;
 		Texture       m_backBufferDepth;
 		Texture       m_backBufferStencil;
 		uint32_t      m_backBufferPixelFormatHash;
@@ -2215,6 +2186,10 @@ namespace bgfx { namespace mtl
 		BlitCommandEncoder   m_blitCommandEncoder;
 		RenderCommandEncoder m_renderCommandEncoder;
 		FrameBufferHandle    m_renderCommandEncoderFrameBufferHandle;
+
+#if BX_PLATFORM_OSX
+		NSAutoreleasePool*   m_pool;
+#endif
 	};
 
 	RendererContextI* rendererCreate(const Init& _init)
@@ -2598,12 +2573,14 @@ namespace bgfx { namespace mtl
 			{
 				desc.textureType = MTLTextureType2DMultisample;
 				desc.sampleCount = sampleCount;
+
 				if (s_renderMtl->m_iOS9Runtime
 				||  s_renderMtl->m_macOS11Runtime)
 				{
 					desc.storageMode = (MTLStorageMode)(2 /* MTLStorageModePrivate */);
 				}
-				m_ptrMSAA = s_renderMtl->m_device.newTextureWithDescriptor(desc);
+
+				m_ptrMsaa = s_renderMtl->m_device.newTextureWithDescriptor(desc);
 			}
 
 			if (m_requestedFormat == TextureFormat::D24S8
@@ -2823,32 +2800,32 @@ namespace bgfx { namespace mtl
 			if (NULL == m_metalLayer)
 #if BX_PLATFORM_IOS
 			{
-                CAMetalLayer* metalLayer = (CAMetalLayer*)_nwh;
-                if (NULL == metalLayer
-                    || ![metalLayer isKindOfClass:NSClassFromString(@"CAMetalLayer")])
-                {
-                    BX_WARN(NULL != metalLayer, "Unable to create Metal device. Please set platform data window to a CAMetalLayer");
-                    return;
-                }
+				CAMetalLayer* metalLayer = (CAMetalLayer*)_nwh;
+				if (NULL == metalLayer
+				|| ![metalLayer isKindOfClass:NSClassFromString(@"CAMetalLayer")])
+				{
+					BX_WARN(false, "Unable to create Metal device. Please set platform data window to a CAMetalLayer");
+					return;
+				}
 
-                m_metalLayer = metalLayer;
+				m_metalLayer = metalLayer;
 			}
 #elif BX_PLATFORM_OSX
-            {
-                NSObject* nvh = (NSObject*)_nwh;
-                if ([nvh isKindOfClass:[CAMetalLayer class]])
-                {
-                    CAMetalLayer* metalLayer = (CAMetalLayer*)_nwh;
-                    m_metalLayer = metalLayer;
-                }
-                else
-                {
-                    NSWindow* nsWindow = (NSWindow*)_nwh;
-                    [nsWindow.contentView setWantsLayer:YES];
-                    m_metalLayer = [CAMetalLayer layer];
-                    [nsWindow.contentView setLayer:m_metalLayer];
-                }
-            }
+			{
+				NSObject* nvh = (NSObject*)_nwh;
+				if ([nvh isKindOfClass:[CAMetalLayer class]])
+				{
+					CAMetalLayer* metalLayer = (CAMetalLayer*)_nwh;
+					m_metalLayer = metalLayer;
+				}
+				else
+				{
+					NSWindow* nsWindow = (NSWindow*)_nwh;
+					[nsWindow.contentView setWantsLayer:YES];
+					m_metalLayer = [CAMetalLayer layer];
+					[nsWindow.contentView setLayer:m_metalLayer];
+				}
+			}
 #endif // BX_PLATFORM_*
 		}
 
@@ -2865,26 +2842,30 @@ namespace bgfx { namespace mtl
 
 	void SwapChainMtl::resize(FrameBufferMtl &_frameBuffer, uint32_t _width, uint32_t _height, uint32_t _flags)
 	{
-        int sampleCount = s_msaa[(_flags&BGFX_RESET_MSAA_MASK)>>BGFX_RESET_MSAA_SHIFT];
+		int sampleCount = s_msaa[(_flags&BGFX_RESET_MSAA_MASK)>>BGFX_RESET_MSAA_SHIFT];
 
 #if BX_PLATFORM_OSX > 101300
-        m_metalLayer.displaySyncEnabled = 0 != (_flags&BGFX_RESET_VSYNC);
+		m_metalLayer.displaySyncEnabled = 0 != (_flags&BGFX_RESET_VSYNC);
 #endif // BX_PLATFORM_OSX > 101300
 
 		m_metalLayer.drawableSize = CGSizeMake(_width, _height);
 		m_metalLayer.pixelFormat = (_flags & BGFX_RESET_SRGB_BACKBUFFER)
-								? MTLPixelFormatBGRA8Unorm_sRGB
-								: MTLPixelFormatBGRA8Unorm
-								;
+			? MTLPixelFormatBGRA8Unorm_sRGB
+			: MTLPixelFormatBGRA8Unorm
+			;
 
 		TextureDescriptor desc = s_renderMtl->m_textureDescriptor;
 
 		desc.textureType = sampleCount > 1 ? MTLTextureType2DMultisample : MTLTextureType2D;
 
 		if (s_renderMtl->m_hasPixelFormatDepth32Float_Stencil8)
+		{
 			desc.pixelFormat = MTLPixelFormatDepth32Float_Stencil8;
+		}
 		else
+		{
 			desc.pixelFormat = MTLPixelFormatDepth32Float;
+		}
 
 		desc.width  = _width;
 		desc.height = _height;
@@ -2892,18 +2873,21 @@ namespace bgfx { namespace mtl
 		desc.mipmapLevelCount = 1;
 		desc.sampleCount = sampleCount;
 		desc.arrayLength = 1;
-		if ( s_renderMtl->m_iOS9Runtime || s_renderMtl->m_macOS11Runtime )
+
+		if (s_renderMtl->m_iOS9Runtime
+		||  s_renderMtl->m_macOS11Runtime)
 		{
 			desc.cpuCacheMode = MTLCPUCacheModeDefaultCache;
 			desc.storageMode  = MTLStorageModePrivate;
-			desc.usage		  = MTLTextureUsageRenderTarget;
+			desc.usage        = MTLTextureUsageRenderTarget;
 		}
 
 		if (NULL != m_backBufferDepth)
 		{
 			release(m_backBufferDepth);
 		}
-		m_backBufferDepth   = s_renderMtl->m_device.newTextureWithDescriptor(desc);
+
+		m_backBufferDepth = s_renderMtl->m_device.newTextureWithDescriptor(desc);
 
 		if (NULL != m_backBufferStencil)
 		{
@@ -2913,7 +2897,7 @@ namespace bgfx { namespace mtl
 		if (s_renderMtl->m_hasPixelFormatDepth32Float_Stencil8)
 		{
 			m_backBufferStencil = m_backBufferDepth;
-            retain(m_backBufferStencil);
+			retain(m_backBufferStencil);
 		}
 		else
 		{
@@ -2923,12 +2907,13 @@ namespace bgfx { namespace mtl
 
 		if ( sampleCount > 1 )
 		{
-			if (NULL != m_backBufferColorMSAA)
+			if (NULL != m_backBufferColorMsaa)
 			{
-				release(m_backBufferColorMSAA);
+				release(m_backBufferColorMsaa);
 			}
+
 			desc.pixelFormat = m_metalLayer.pixelFormat;
-			m_backBufferColorMSAA = s_renderMtl->m_device.newTextureWithDescriptor(desc);
+			m_backBufferColorMsaa = s_renderMtl->m_device.newTextureWithDescriptor(desc);
 		}
 
 		bx::HashMurmur2A murmur;
@@ -3149,7 +3134,7 @@ namespace bgfx { namespace mtl
 	{
 	}
 
-    static void setTimestamp(void* _data)
+	static void setTimestamp(void* _data)
 	{
 		*( (int64_t*)_data) = bx::getHPCounter();
 	}
@@ -3618,7 +3603,7 @@ namespace bgfx { namespace mtl
 									? MTLLoadActionClear
 									: MTLLoadActionLoad
 									;
-								depthAttachment.storeAction = NULL != m_mainFrameBuffer.m_swapChain->m_backBufferColorMSAA
+								depthAttachment.storeAction = NULL != m_mainFrameBuffer.m_swapChain->m_backBufferColorMsaa
 									? MTLStoreActionDontCare
 									: MTLStoreActionStore
 									;
@@ -3632,7 +3617,7 @@ namespace bgfx { namespace mtl
 									? MTLLoadActionClear
 									: MTLLoadActionLoad
 									;
-								stencilAttachment.storeAction = NULL != m_mainFrameBuffer.m_swapChain->m_backBufferColorMSAA
+								stencilAttachment.storeAction = NULL != m_mainFrameBuffer.m_swapChain->m_backBufferColorMsaa
 									? MTLStoreActionDontCare
 									: MTLStoreActionStore
 									;

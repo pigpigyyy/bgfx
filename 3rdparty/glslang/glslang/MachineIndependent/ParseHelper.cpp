@@ -1,7 +1,7 @@
 //
 // Copyright (C) 2002-2005  3Dlabs Inc. Ltd.
 // Copyright (C) 2012-2015 LunarG, Inc.
-// Copyright (C) 2015-2016 Google, Inc.
+// Copyright (C) 2015-2018 Google, Inc.
 // Copyright (C) 2017 ARM Limited.
 //
 // All rights reserved.
@@ -4059,6 +4059,8 @@ void TParseContext::redeclareBuiltinBlock(const TSourceLoc& loc, TTypeList& newT
     if (currentBlockQualifier.storage == EvqVaryingOut && globalOutputDefaults.hasXfbBuffer()) {
         if (!currentBlockQualifier.hasXfbBuffer())
             currentBlockQualifier.layoutXfbBuffer = globalOutputDefaults.layoutXfbBuffer;
+        if (!currentBlockQualifier.hasStream())
+            currentBlockQualifier.layoutStream = globalOutputDefaults.layoutStream;
         fixXfbOffsets(currentBlockQualifier, newTypeList);
     }
 
@@ -4141,6 +4143,9 @@ void TParseContext::redeclareBuiltinBlock(const TSourceLoc& loc, TTypeList& newT
             if (newType.getQualifier().hasXfbBuffer() &&
                 newType.getQualifier().layoutXfbBuffer != currentBlockQualifier.layoutXfbBuffer)
                 error(memberLoc, "member cannot contradict block (or what block inherited from global)", "xfb_buffer", "");
+            if (newType.getQualifier().hasStream() &&
+                newType.getQualifier().layoutStream != currentBlockQualifier.layoutStream)
+                error(memberLoc, "member cannot contradict block (or what block inherited from global)", "xfb_stream", "");
             oldType.getQualifier().centroid = newType.getQualifier().centroid;
             oldType.getQualifier().sample = newType.getQualifier().sample;
             oldType.getQualifier().invariant = newType.getQualifier().invariant;
@@ -4152,8 +4157,8 @@ void TParseContext::redeclareBuiltinBlock(const TSourceLoc& loc, TTypeList& newT
             oldType.getQualifier().layoutXfbBuffer = newType.getQualifier().layoutXfbBuffer;
             oldType.getQualifier().layoutXfbStride = newType.getQualifier().layoutXfbStride;
             if (oldType.getQualifier().layoutXfbOffset != TQualifier::layoutXfbBufferEnd) {
-                // if any member as an xfb_offset, then the block's xfb_buffer inherents current xfb_buffer,
-                // and for xfb processing, the member needs it as well, along with xfb_stride
+                // If any member has an xfb_offset, then the block's xfb_buffer inherents current xfb_buffer,
+                // and for xfb processing, the member needs it as well, along with xfb_stride.
                 type.getQualifier().layoutXfbBuffer = currentBlockQualifier.layoutXfbBuffer;
                 oldType.getQualifier().layoutXfbBuffer = currentBlockQualifier.layoutXfbBuffer;
             }
@@ -4176,6 +4181,11 @@ void TParseContext::redeclareBuiltinBlock(const TSourceLoc& loc, TTypeList& newT
                 ++member;
             }
         }
+    }
+
+    if (spvVersion.vulkan > 0) {
+        // ...then streams apply to built-in blocks, instead of them being only on stream 0
+        type.getQualifier().layoutStream = currentBlockQualifier.layoutStream;
     }
 
     if (numOriginalMembersFound < newTypeList.size())
@@ -5750,14 +5760,14 @@ const TFunction* TParseContext::findFunction(const TSourceLoc& loc, const TFunct
         return nullptr;
     }
 
-    bool explicitTypesEnabled = extensionTurnedOn(E_GL_KHX_shader_explicit_arithmetic_types) ||
-                                extensionTurnedOn(E_GL_KHX_shader_explicit_arithmetic_types_int8) ||
-                                extensionTurnedOn(E_GL_KHX_shader_explicit_arithmetic_types_int16) ||
-                                extensionTurnedOn(E_GL_KHX_shader_explicit_arithmetic_types_int32) ||
-                                extensionTurnedOn(E_GL_KHX_shader_explicit_arithmetic_types_int64) ||
-                                extensionTurnedOn(E_GL_KHX_shader_explicit_arithmetic_types_float16) ||
-                                extensionTurnedOn(E_GL_KHX_shader_explicit_arithmetic_types_float32) ||
-                                extensionTurnedOn(E_GL_KHX_shader_explicit_arithmetic_types_float64);
+    bool explicitTypesEnabled = extensionTurnedOn(E_GL_EXT_shader_explicit_arithmetic_types) ||
+                                extensionTurnedOn(E_GL_EXT_shader_explicit_arithmetic_types_int8) ||
+                                extensionTurnedOn(E_GL_EXT_shader_explicit_arithmetic_types_int16) ||
+                                extensionTurnedOn(E_GL_EXT_shader_explicit_arithmetic_types_int32) ||
+                                extensionTurnedOn(E_GL_EXT_shader_explicit_arithmetic_types_int64) ||
+                                extensionTurnedOn(E_GL_EXT_shader_explicit_arithmetic_types_float16) ||
+                                extensionTurnedOn(E_GL_EXT_shader_explicit_arithmetic_types_float32) ||
+                                extensionTurnedOn(E_GL_EXT_shader_explicit_arithmetic_types_float64);
 
     if (profile == EEsProfile || version < 120)
         function = findFunctionExact(loc, call, builtIn);
@@ -6872,6 +6882,16 @@ void TParseContext::declareBlock(const TSourceLoc& loc, TTypeList& typeList, con
     }
 
     layoutMemberLocationArrayCheck(loc, memberWithLocation, arraySizes);
+
+    // Ensure that the block has an XfbBuffer assigned. This is needed
+    // because if the block has a XfbOffset assigned, then it is
+    // assumed that it has implicitly assigned the current global
+    // XfbBuffer, and because it's members need to be assigned a
+    // XfbOffset if they lack it.
+    if (currentBlockQualifier.storage == EvqVaryingOut && globalOutputDefaults.hasXfbBuffer()) {
+       if (!currentBlockQualifier.hasXfbBuffer() && currentBlockQualifier.hasXfbOffset())
+          currentBlockQualifier.layoutXfbBuffer = globalOutputDefaults.layoutXfbBuffer;
+    }
 
     // Process the members
     fixBlockLocations(loc, currentBlockQualifier, typeList, memberWithLocation, memberWithoutLocation);

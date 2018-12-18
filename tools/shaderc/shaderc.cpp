@@ -155,6 +155,32 @@ namespace bgfx
 	};
 	BX_STATIC_ASSERT(BX_COUNTOF(s_uniformTypeName) == UniformType::Count*2);
 
+	static const char* s_allowedVertexShaderInputs[] =
+	{
+		"a_position",
+		"a_normal",
+		"a_tangent",
+		"a_bitangent",
+		"a_color0",
+		"a_color1",
+		"a_color2",
+		"a_color3",
+		"a_indices",
+		"a_weight",
+		"a_texcoord0",
+		"a_texcoord1",
+		"a_texcoord2",
+		"a_texcoord3",
+		"a_texcoord4",
+		"a_texcoord5",
+		"a_texcoord6",
+		"a_texcoord7",
+		"i_data0",
+		"i_data1",
+		"i_data2",
+		"i_data3",
+		"i_data4",
+	};
 
 	Options::Options()
 		: shaderType(' ')
@@ -414,8 +440,18 @@ namespace bgfx
 	class File
 	{
 	public:
-		File(const bx::FilePath& _filePath)
+		File()
 			: m_data(NULL)
+			, m_size(0)
+		{
+		}
+
+		~File()
+		{
+			delete [] m_data;
+		}
+
+		void load(const bx::FilePath& _filePath)
 		{
 			bx::FileReader reader;
 			if (bx::open(&reader, _filePath) )
@@ -435,11 +471,6 @@ namespace bgfx
 
 				m_data[m_size] = '\0';
 			}
-		}
-
-		~File()
-		{
-			delete [] m_data;
 		}
 
 		const char* getData() const
@@ -733,27 +764,27 @@ namespace bgfx
 
 	typedef std::vector<std::string> InOut;
 
-	uint32_t parseInOut(InOut& _inout, const char* _str, const char* _eol)
+	uint32_t parseInOut(InOut& _inout, const bx::StringView& _str)
 	{
 		uint32_t hash = 0;
-		_str = bx::strLTrimSpace(_str).getPtr();
+		bx::StringView str = bx::strLTrimSpace(_str);
 
-		if (_str < _eol)
+		if (!str.isEmpty() )
 		{
-			const char* delim;
+			bx::StringView delim;
 			do
 			{
-				delim = strpbrk(_str, " ,");
-				if (NULL != delim)
+				delim = bx::strFind(str, ',');
+
+				const bx::StringView token(bx::strRTrim(bx::StringView(str.getPtr(), delim.getPtr() ), " ") );
+
+				if (!token.isEmpty() )
 				{
-					delim = delim > _eol ? _eol : delim;
-					std::string token;
-					token.assign(_str, delim-_str);
-					_inout.push_back(token);
-					_str = bx::strLTrimSpace(delim + 1).getPtr();
+					_inout.push_back(std::string(token.getPtr(), token.getTerm() ) );
+					str = bx::strLTrimSpace(bx::StringView(delim.getPtr() + 1, str.getTerm() ) );
 				}
 			}
-			while (delim < _eol && _str < _eol && NULL != delim);
+			while (!delim.isEmpty() );
 
 			std::sort(_inout.begin(), _inout.end() );
 
@@ -1187,36 +1218,61 @@ namespace bgfx
 			input = const_cast<char*>(bx::strLTrimSpace(data).getPtr() );
 			while (input[0] == '$')
 			{
-				const char* str = bx::strLTrimSpace(input+1).getPtr();
+				bx::StringView str = bx::strLTrimSpace(input+1);
 				bx::StringView eol = bx::strFindEol(str);
 				bx::StringView nl  = bx::strFindNl(eol);
 				input = const_cast<char*>(nl.getPtr() );
 
 				if (0 == bx::strCmp(str, "input", 5) )
 				{
-					str += 5;
+					str = bx::StringView(str.getPtr() + 5, str.getTerm() );
 					bx::StringView comment = bx::strFind(str, "//");
 					eol = !comment.isEmpty() && comment.getPtr() < eol.getPtr() ? comment.getPtr() : eol;
-					inputHash = parseInOut(shaderInputs, str, eol.getPtr() );
+					inputHash = parseInOut(shaderInputs, bx::StringView(str.getPtr(), eol.getPtr() ) );
 				}
 				else if (0 == bx::strCmp(str, "output", 6) )
 				{
-					str += 6;
+					str = bx::StringView(str.getPtr() + 6, str.getTerm() );
 					bx::StringView comment = bx::strFind(str, "//");
 					eol = !comment.isEmpty() && comment.getPtr() < eol.getPtr() ? comment.getPtr() : eol;
-					outputHash = parseInOut(shaderOutputs, str, eol.getPtr() );
+					outputHash = parseInOut(shaderOutputs, bx::StringView(str.getPtr(), eol.getPtr() ) );
 				}
 				else if (0 == bx::strCmp(str, "raw", 3) )
 				{
 					raw = true;
-					str += 3;
+					str = bx::StringView(str.getPtr() + 3, str.getTerm() );
 				}
 
 				input = const_cast<char*>(bx::strLTrimSpace(input).getPtr() );
 			}
 		}
 
-		if (raw)
+		bool invalidShaderAttribute = false;
+		if ('v' == _options.shaderType)
+		{
+			for (InOut::const_iterator it = shaderInputs.begin(), itEnd = shaderInputs.end(); it != itEnd; ++it)
+			{
+				if (bx::findIdentifierMatch(it->c_str(), s_allowedVertexShaderInputs).isEmpty() )
+				{
+					invalidShaderAttribute = true;
+					fprintf(stderr
+						, "Invalid vertex shader input attribute '%s'.\n"
+						  "\n"
+						  "Valid input attributes:\n"
+						  "  a_position, a_normal, a_tangent, a_bitangent, a_color0, a_color1, a_color2, a_color3, a_indices, a_weight,\n"
+						  "  a_texcoord0, a_texcoord1, a_texcoord2, a_texcoord3, a_texcoord4, a_texcoord5, a_texcoord6, a_texcoord7,\n"
+						  "  i_data0, i_data1, i_data2, i_data3, i_data4.\n"
+						  "\n"
+						, it->c_str() );
+					break;
+				}
+			}
+		}
+
+		if (invalidShaderAttribute)
+		{
+		}
+		else  if (raw)
 		{
 			if ('f' == _options.shaderType)
 			{
@@ -2403,12 +2459,13 @@ namespace bgfx
 		else
 		{
 			const char* varying = NULL;
+			File attribdef;
 
 			if ('c' != options.shaderType)
 			{
 				std::string defaultVarying = dir + "varying.def.sc";
 				const char* varyingdef = cmdLine.findOption("varyingdef", defaultVarying.c_str() );
-				File attribdef(varyingdef);
+				attribdef.load(varyingdef);
 				varying = attribdef.getData();
 				if (NULL     != varying
 				&&  *varying != '\0')

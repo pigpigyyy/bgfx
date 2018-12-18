@@ -63,6 +63,7 @@ std::string FileNameAsCustomTestSuffixIoMap(
 }
 
 using CompileVulkanToSpirvTest = GlslangTest<::testing::TestWithParam<std::string>>;
+using CompileVulkanToDebugSpirvTest = GlslangTest<::testing::TestWithParam<std::string>>;
 using CompileVulkan1_1ToSpirvTest = GlslangTest<::testing::TestWithParam<std::string>>;
 using CompileOpenGLToSpirvTest = GlslangTest<::testing::TestWithParam<std::string>>;
 using VulkanSemantics = GlslangTest<::testing::TestWithParam<std::string>>;
@@ -85,6 +86,17 @@ TEST_P(CompileVulkanToSpirvTest, FromFile)
     loadFileCompileAndCheck(GlobalTestSettings.testRoot, GetParam(),
                             Source::GLSL, Semantics::Vulkan, glslang::EShTargetVulkan_1_0,
                             Target::Spv);
+}
+
+// Compiling GLSL to SPIR-V with debug info under Vulkan semantics. Expected
+// to successfully generate SPIR-V.
+TEST_P(CompileVulkanToDebugSpirvTest, FromFile)
+{
+    loadFileCompileAndCheck(GlobalTestSettings.testRoot, GetParam(),
+                            Source::GLSL, Semantics::Vulkan,
+                            glslang::EShTargetVulkan_1_0,
+                            Target::Spv, true, "",
+                            "/baseResults/", false, true);
 }
 
 TEST_P(CompileVulkan1_1ToSpirvTest, FromFile)
@@ -271,6 +283,10 @@ INSTANTIATE_TEST_CASE_P(
         "spv.flowControl.frag",
         "spv.forLoop.frag",
         "spv.forwardFun.frag",
+        "spv.fragmentDensity.frag",
+        "spv.fragmentDensity.vert",
+        "spv.fragmentDensity-es.frag",
+        "spv.fragmentDensity-neg.frag",
         "spv.fullyCovered.frag",
         "spv.functionCall.frag",
         "spv.functionNestedOpaque.vert",
@@ -367,6 +383,15 @@ INSTANTIATE_TEST_CASE_P(
 
 // clang-format off
 INSTANTIATE_TEST_CASE_P(
+    Glsl, CompileVulkanToDebugSpirvTest,
+    ::testing::ValuesIn(std::vector<std::string>({
+        "spv.pp.line.frag",
+    })),
+    FileNameAsCustomTestSuffix
+);
+
+// clang-format off
+INSTANTIATE_TEST_CASE_P(
     Glsl, CompileVulkan1_1ToSpirvTest,
     ::testing::ValuesIn(std::vector<std::string>({
         "spv.1.3.8bitstorage-ubo.vert",
@@ -380,6 +405,7 @@ INSTANTIATE_TEST_CASE_P(
         "spv.float32.frag",
         "spv.float64.frag",
         "spv.multiView.frag",
+        "spv.RayGenShader11.rgen",
         "spv.subgroup.frag",
         "spv.subgroup.geom",
         "spv.subgroup.tesc",
@@ -443,7 +469,10 @@ INSTANTIATE_TEST_CASE_P(
         "spv.rankShift.comp",
         "spv.specConst.vert",
         "spv.OVR_multiview.vert",
+        "spv.xfbOffsetOnBlockMembersAssignment.vert",
         "spv.xfbOffsetOnStructMembersAssignment.vert",
+        "spv.xfbOverlapOffsetCheckWithBlockAndMember.vert",
+        "spv.xfbStrideJustOnce.vert",
     })),
     FileNameAsCustomTestSuffix
 );
