@@ -6,7 +6,7 @@
 #ifndef BGFX_EMBEDDED_SHADER_H_HEADER_GUARD
 #define BGFX_EMBEDDED_SHADER_H_HEADER_GUARD
 
-#include <bx/macros.h>
+#include "bx/macros.h"
 #include "bgfx.h"
 
 #define BGFX_EMBEDDED_SHADER_DXBC(...)
@@ -75,7 +75,7 @@
 #if BGFX_PLATFORM_SUPPORTS_ESSL
 #	undef  BGFX_EMBEDDED_SHADER_ESSL
 #	define BGFX_EMBEDDED_SHADER_ESSL(_renderer, _name) \
-		{ _renderer, BX_CONCATENATE(_name, _glsl), BX_COUNTOF(BX_CONCATENATE(_name, _glsl) ) },
+		{ _renderer, BX_CONCATENATE(_name, _essl), BX_COUNTOF(BX_CONCATENATE(_name, _essl) ) },
 #endif // BGFX_PLATFORM_SUPPORTS_ESSL
 
 #if BGFX_PLATFORM_SUPPORTS_GLSL
