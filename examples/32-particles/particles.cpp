@@ -290,8 +290,7 @@ public:
 
 		cameraCreate();
 
-		const float initialPos[3] = { 0.0f, 2.0f, -12.0f };
-		cameraSetPosition(initialPos);
+		cameraSetPosition({ 0.0f, 2.0f, -12.0f });
 		cameraSetVerticalAngle(0.0f);
 
 		m_timeOffset = bx::getHPCounter();
@@ -407,16 +406,14 @@ public:
 			DebugDrawEncoder dde;
 			dde.begin(0);
 
-			float center[3] = { 0.0f, 0.0f, 0.0f };
-			dde.drawGrid(Axis::Y, center);
+			dde.drawGrid(Axis::Y, { 0.0f, 0.0f, 0.0f });
 
-			float eye[3];
-			cameraGetPosition(eye);
+			const bx::Vec3 eye = cameraGetPosition();
 
 			m_emitter[currentEmitter].update();
 
 			psUpdate(deltaTime * timeScale);
-			psRender(0, view, bx::load(eye) );
+			psRender(0, view, eye);
 
 			if (showBounds)
 			{

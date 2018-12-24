@@ -634,6 +634,7 @@ namespace bgfx { namespace mtl
 			m_gpuTimer.shutdown();
 
 			m_pipelineStateCache.invalidate();
+			m_pipelineProgram.clear();
 
 			for (uint32_t ii = 0; ii < BX_COUNTOF(m_shaders); ++ii)
 			{
@@ -763,6 +764,19 @@ namespace bgfx { namespace mtl
 
 		void destroyProgram(ProgramHandle _handle) override
 		{
+			for (PipelineProgramArray::iterator it = m_pipelineProgram.begin(); it != m_pipelineProgram.end();)
+			{
+				if (it->program.idx == _handle.idx)
+				{
+					m_pipelineStateCache.invalidate(it->key);
+					it = m_pipelineProgram.erase(it);
+				}
+				else
+				{
+					++it;
+				}
+			}
+
 			m_program[_handle.idx].destroy();
 		}
 
@@ -1713,6 +1727,7 @@ namespace bgfx { namespace mtl
 			uint32_t hash = murmur.end();
 
 			RenderPipelineState pso = m_pipelineStateCache.find(hash);
+
 			if (NULL == pso)
 			{
 				RenderPipelineDescriptor pd = m_renderPipelineDescriptor;
@@ -1722,13 +1737,17 @@ namespace bgfx { namespace mtl
 
 				uint32_t frameBufferAttachment = 1;
 
-				if (!isValid(_fbh) || s_renderMtl->m_frameBuffers[_fbh.idx].m_swapChain)
+				if (!isValid(_fbh)
+				||  s_renderMtl->m_frameBuffers[_fbh.idx].m_swapChain)
 				{
-					SwapChainMtl* swapChain =
-						!isValid(_fbh) ?
-						s_renderMtl->m_mainFrameBuffer.m_swapChain :
-					s_renderMtl->m_frameBuffers[_fbh.idx].m_swapChain;
-					pd.sampleCount = NULL != swapChain->m_backBufferColorMsaa ? swapChain->m_backBufferColorMsaa.sampleCount() : 1;
+					SwapChainMtl* swapChain = !isValid(_fbh)
+						? s_renderMtl->m_mainFrameBuffer.m_swapChain
+						: s_renderMtl->m_frameBuffers[_fbh.idx].m_swapChain
+						;
+					pd.sampleCount = NULL != swapChain->m_backBufferColorMsaa
+						? swapChain->m_backBufferColorMsaa.sampleCount()
+						: 1
+						;
 					pd.colorAttachments[0].pixelFormat = swapChain->currentDrawable().texture.pixelFormat;
 					pd.depthAttachmentPixelFormat      = swapChain->m_backBufferDepth.m_obj.pixelFormat;
 					pd.stencilAttachmentPixelFormat    = swapChain->m_backBufferStencil.m_obj.pixelFormat;
@@ -1965,9 +1984,11 @@ namespace bgfx { namespace mtl
 												PredefinedUniform::Enum predefined = nameToPredefinedUniformEnum(name);
 												if (PredefinedUniform::Count != predefined)
 												{
-													program.m_predefined[program.m_numPredefined].m_loc   = uint32_t(uniform.offset);
-													program.m_predefined[program.m_numPredefined].m_count = uint16_t(num);
-													program.m_predefined[program.m_numPredefined].m_type  = uint8_t(predefined|fragmentBit);
+													PredefinedUniform& pu = program.m_predefined[program.m_numPredefined];
+
+													pu.m_loc   = uint32_t(uniform.offset);
+													pu.m_count = uint16_t(num);
+													pu.m_type  = uint8_t(predefined|fragmentBit);
 													++program.m_numPredefined;
 												}
 												else
@@ -2004,10 +2025,14 @@ namespace bgfx { namespace mtl
 											}
 											else
 											{
-												program.m_samplers[program.m_samplerCount].m_index = uint32_t(arg.index);
-												program.m_samplers[program.m_samplerCount].m_uniform = info->m_handle;
-												program.m_samplers[program.m_samplerCount].m_fragment = fragmentBit ? 1 : 0;
+												SamplerInfo& si = program.m_samplers[program.m_samplerCount];
+
+												si.m_index    = uint32_t(arg.index);
+												si.m_uniform  = info->m_handle;
+												si.m_fragment = fragmentBit ? 1 : 0;
+
 												++program.m_samplerCount;
+
 												BX_TRACE("texture %s %d index:%d", name, info->m_handle, uint32_t(arg.index) );
 											}
 										}
@@ -2030,6 +2055,7 @@ namespace bgfx { namespace mtl
 				}
 
 				m_pipelineStateCache.add(hash, pso);
+				m_pipelineProgram.push_back({hash, _program});
 			}
 
 			return pso;
@@ -2150,6 +2176,15 @@ namespace bgfx { namespace mtl
 		UniformRegistry m_uniformReg;
 		void*           m_uniforms[BGFX_CONFIG_MAX_UNIFORMS];
 
+		struct PipelineProgram
+		{
+			uint64_t      key;
+			ProgramHandle program;
+		};
+
+		typedef stl::vector<PipelineProgram> PipelineProgramArray;
+
+		PipelineProgramArray             m_pipelineProgram;
 		StateCacheT<RenderPipelineState> m_pipelineStateCache;
 		StateCacheT<DepthStencilState>   m_depthStencilStateCache;
 		StateCacheT<SamplerState>        m_samplerStateCache;
@@ -3414,9 +3449,8 @@ namespace bgfx { namespace mtl
 		RenderBind currentBind;
 		currentBind.clear();
 
-		const bool hmdEnabled = false;
 		static ViewState viewState;
-		viewState.reset(_render, hmdEnabled);
+		viewState.reset(_render);
 		uint32_t blendFactor = 0;
 
 		bool wireframe = !!(_render->m_debug&BGFX_DEBUG_WIREFRAME);
@@ -3450,13 +3484,10 @@ namespace bgfx { namespace mtl
 
 		if (0 == (_render->m_debug&BGFX_DEBUG_IFH) )
 		{
-			bool viewRestart = false;
-			uint8_t eye = 0;
-			uint8_t restartState = 0;
 			viewState.m_rect = _render->m_view[0].m_rect;
-
 			int32_t numItems = _render->m_numRenderItems;
-			for (int32_t item = 0, restartItem = numItems; item < numItems || restartItem < numItems;)
+
+			for (int32_t item = 0; item < numItems;)
 			{
 				const uint64_t encodedKey = _render->m_sortKeys[item];
 				const bool isCompute = key.decode(encodedKey, _render->m_viewRemap);
@@ -3474,44 +3505,10 @@ namespace bgfx { namespace mtl
 
 				if (viewChanged)
 				{
-					if (1 == restartState)
-					{
-						restartState = 2;
-						item = restartItem;
-						restartItem = numItems;
-						view = UINT16_MAX;
-						continue;
-					}
-
 					view = key.m_view;
 					currentProgram = BGFX_INVALID_HANDLE;
 
-					viewRestart  = BGFX_VIEW_STEREO == (_render->m_view[view].m_flags & BGFX_VIEW_STEREO);
-					viewRestart &= hmdEnabled;
-
-					if (viewRestart)
-					{
-						if (0 == restartState)
-						{
-							restartState = 1;
-							restartItem  = item - 1;
-						}
-
-						eye = (restartState - 1) & 1;
-						restartState &= 1;
-					}
-					else
-					{
-						eye = 0;
-					}
-
 					viewState.m_rect = _render->m_view[view].m_rect;
-
-					if (viewRestart)
-					{
-						viewState.m_rect.m_x = eye * (viewState.m_rect.m_width+1)/2;
-						viewState.m_rect.m_width /= 2;
-					}
 
 					submitBlit(bs, view);
 
@@ -3968,7 +3965,7 @@ namespace bgfx { namespace mtl
 						}
 					}
 
-					viewState.setPredefined<4>(this, view, eye, program, _render, draw);
+					viewState.setPredefined<4>(this, view, program, _render, draw);
 
 					m_uniformBufferFragmentOffset += fragmentUniformBufferSize;
 					m_uniformBufferVertexOffset = m_uniformBufferFragmentOffset;
@@ -3980,7 +3977,7 @@ namespace bgfx { namespace mtl
 
 					for (uint32_t sampler = 0; sampler < program.m_samplerCount; ++sampler)
 					{
-						ProgramMtl::SamplerInfo& samplerInfo = program.m_samplers[sampler];
+						SamplerInfo& samplerInfo = program.m_samplers[sampler];
 
 						UniformHandle handle = samplerInfo.m_uniform;
 						int stage = *((int*)m_uniforms[handle.idx]);
@@ -4066,7 +4063,7 @@ namespace bgfx { namespace mtl
 							numInstances      = draw.m_numInstances;
 							numPrimsRendered  = numPrimsSubmitted*draw.m_numInstances;
 
-							rce.drawPrimitives(prim.m_type, 0, draw.m_numVertices, draw.m_numInstances);
+							rce.drawPrimitives(prim.m_type, 0, numVertices, draw.m_numInstances);
 						}
 					}
 
