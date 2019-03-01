@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2018 Branimir Karadzic. All rights reserved.
+ * Copyright 2011-2019 Branimir Karadzic. All rights reserved.
  * License: https://github.com/bkaradzic/bgfx#license-bsd-2-clause
  */
 
@@ -220,7 +220,7 @@ public:
 				const uint32_t abgr = m_mwc.gen();
 				for (uint32_t ii = 0; ii < BX_COUNTOF(s_cubeVertices); ++ii)
 				{
-					bx::vec3MulMtx(&vertex[ii].m_x, &s_cubeVertices[ii].m_x, mtx);
+					bx::store(&vertex[ii].m_x, bx::mul(bx::load<bx::Vec3>(&s_cubeVertices[ii].m_x), mtx) );
 					vertex[ii].m_abgr = abgr;
 				}
 

@@ -57,6 +57,7 @@
 #include <sstream>
 #include <stack>
 #include <unordered_map>
+#include <map>
 
 namespace spv {
 
@@ -74,20 +75,33 @@ public:
         source = lang;
         sourceVersion = version;
     }
+    spv::Id getStringId(const std::string& str)
+    {
+        auto sItr = stringIds.find(str);
+        if (sItr != stringIds.end())
+            return sItr->second;
+        spv::Id strId = getUniqueId();
+        Instruction* fileString = new Instruction(strId, NoType, OpString);
+        const char* file_c_str = str.c_str();
+        fileString->addStringOperand(file_c_str);
+        strings.push_back(std::unique_ptr<Instruction>(fileString));
+        stringIds[file_c_str] = strId;
+        return strId;
+    }
     void setSourceFile(const std::string& file)
     {
-        Instruction* fileString = new Instruction(getUniqueId(), NoType, OpString);
-        const char* file_c_str = file.c_str();
-        fileString->addStringOperand(file_c_str);
-        sourceFileStringId = fileString->getResultId();
-        strings.push_back(std::unique_ptr<Instruction>(fileString));
-        stringIds[file_c_str] = sourceFileStringId;
+        sourceFileStringId = getStringId(file);
     }
     void setSourceText(const std::string& text) { sourceText = text; }
     void addSourceExtension(const char* ext) { sourceExtensions.push_back(ext); }
     void addModuleProcessed(const std::string& p) { moduleProcesses.push_back(p.c_str()); }
     void setEmitOpLines() { emitOpLines = true; }
     void addExtension(const char* ext) { extensions.insert(ext); }
+    void addInclude(const std::string& name, const std::string& text)
+    {
+        spv::Id incId = getStringId(name);
+        includeFiles[incId] = &text;
+    }
     Id import(const char*);
     void setMemoryModel(spv::AddressingModel addr, spv::MemoryModel mem)
     {
@@ -124,7 +138,9 @@ public:
     // For creating new types (will return old type if the requested one was already made).
     Id makeVoidType();
     Id makeBoolType();
-    Id makePointer(StorageClass, Id type);
+    Id makePointer(StorageClass, Id pointee);
+    Id makeForwardPointer(StorageClass);
+    Id makePointerFromForwardPointer(StorageClass, Id forwardPointerType, Id pointee);
     Id makeIntegerType(int width, bool hasSign);   // generic
     Id makeIntType(int width) { return makeIntegerType(width, true); }
     Id makeUintType(int width) { return makeIntegerType(width, false); }
@@ -180,6 +196,7 @@ public:
     bool isSamplerType(Id typeId)      const { return getTypeClass(typeId) == OpTypeSampler; }
     bool isSampledImageType(Id typeId) const { return getTypeClass(typeId) == OpTypeSampledImage; }
     bool containsType(Id typeId, Op typeOp, unsigned int width) const;
+    bool containsPhysicalStorageBufferOrArray(Id typeId) const;
 
     bool isConstantOpCode(Op opcode) const;
     bool isSpecConstantOpCode(Op opcode) const;
@@ -286,10 +303,10 @@ public:
     Id createUndefined(Id type);
 
     // Store into an Id and return the l-value
-    void createStore(Id rValue, Id lValue, spv::MemoryAccessMask memoryAccess = spv::MemoryAccessMaskNone, spv::Scope scope = spv::ScopeMax);
+    void createStore(Id rValue, Id lValue, spv::MemoryAccessMask memoryAccess = spv::MemoryAccessMaskNone, spv::Scope scope = spv::ScopeMax, unsigned int alignment = 0);
 
     // Load from an Id and return it
-    Id createLoad(Id lValue, spv::MemoryAccessMask memoryAccess = spv::MemoryAccessMaskNone, spv::Scope scope = spv::ScopeMax);
+    Id createLoad(Id lValue, spv::MemoryAccessMask memoryAccess = spv::MemoryAccessMaskNone, spv::Scope scope = spv::ScopeMax, unsigned int alignment = 0);
 
     // Create an OpAccessChain instruction
     Id createAccessChain(StorageClass, Id base, const std::vector<Id>& offsets);
@@ -521,6 +538,7 @@ public:
         Id component;                  // a dynamic component index, can coexist with a swizzle, done after the swizzle, NoResult if not present
         Id preSwizzleBaseType;         // dereferenced type, before swizzle or component is applied; NoType unless a swizzle or component is present
         bool isRValue;                 // true if 'base' is an r-value, otherwise, base is an l-value
+        unsigned int alignment;        // bitwise OR of alignment values passed in. Accumulates worst alignment. Only tracks base and (optional) component selection alignment.
 
         // Accumulate whether anything in the chain of structures has coherent decorations.
         struct CoherentFlags {
@@ -587,31 +605,34 @@ public:
     }
 
     // push offset onto the end of the chain
-    void accessChainPush(Id offset, AccessChain::CoherentFlags coherentFlags)
+    void accessChainPush(Id offset, AccessChain::CoherentFlags coherentFlags, unsigned int alignment)
     {
         accessChain.indexChain.push_back(offset);
         accessChain.coherentFlags |= coherentFlags;
+        accessChain.alignment |= alignment;
     }
 
     // push new swizzle onto the end of any existing swizzle, merging into a single swizzle
-    void accessChainPushSwizzle(std::vector<unsigned>& swizzle, Id preSwizzleBaseType);
+    void accessChainPushSwizzle(std::vector<unsigned>& swizzle, Id preSwizzleBaseType, AccessChain::CoherentFlags coherentFlags, unsigned int alignment);
 
     // push a dynamic component selection onto the access chain, only applicable with a
     // non-trivial swizzle or no swizzle
-    void accessChainPushComponent(Id component, Id preSwizzleBaseType)
+    void accessChainPushComponent(Id component, Id preSwizzleBaseType, AccessChain::CoherentFlags coherentFlags, unsigned int alignment)
     {
         if (accessChain.swizzle.size() != 1) {
             accessChain.component = component;
             if (accessChain.preSwizzleBaseType == NoType)
                 accessChain.preSwizzleBaseType = preSwizzleBaseType;
         }
+        accessChain.coherentFlags |= coherentFlags;
+        accessChain.alignment |= alignment;
     }
 
     // use accessChain and swizzle to store value
-    void accessChainStore(Id rvalue, spv::MemoryAccessMask memoryAccess = spv::MemoryAccessMaskNone, spv::Scope scope = spv::ScopeMax);
+    void accessChainStore(Id rvalue, spv::MemoryAccessMask memoryAccess = spv::MemoryAccessMaskNone, spv::Scope scope = spv::ScopeMax, unsigned int alignment = 0);
 
     // use accessChain and swizzle to load an r-value
-    Id accessChainLoad(Decoration precision, Decoration nonUniform, Id ResultType, spv::MemoryAccessMask memoryAccess = spv::MemoryAccessMaskNone, spv::Scope scope = spv::ScopeMax);
+    Id accessChainLoad(Decoration precision, Decoration nonUniform, Id ResultType, spv::MemoryAccessMask memoryAccess = spv::MemoryAccessMaskNone, spv::Scope scope = spv::ScopeMax, unsigned int alignment = 0);
 
     // get the direct pointer for an l-value
     Id accessChainGetLValue();
@@ -625,7 +646,7 @@ public:
     void postProcess();
 
     // Hook to visit each instruction in a block in a function
-    void postProcess(const Instruction&);
+    void postProcess(Instruction&);
     // Hook to visit each instruction in a reachable block in a function.
     void postProcessReachable(const Instruction&);
     // Hook to visit each non-32-bit sized float/int operation in a block.
@@ -658,8 +679,10 @@ public:
     void createAndSetNoPredecessorBlock(const char*);
     void createSelectionMerge(Block* mergeBlock, unsigned int control);
     void dumpSourceInstructions(std::vector<unsigned int>&) const;
+    void dumpSourceInstructions(const spv::Id fileId, const std::string& text, std::vector<unsigned int>&) const;
     void dumpInstructions(std::vector<unsigned int>&, const std::vector<std::unique_ptr<Instruction> >&) const;
     void dumpModuleProcesses(std::vector<unsigned int>&) const;
+    spv::MemoryAccessMask sanitizeMemoryAccessForStorageClass(spv::MemoryAccessMask memoryAccess, StorageClass sc) const;
 
     unsigned int spvVersion;     // the version of SPIR-V to emit in the header
     SourceLanguage source;
@@ -707,6 +730,9 @@ public:
 
     // map from strings to their string ids
     std::unordered_map<std::string, spv::Id> stringIds;
+
+    // map from include file name ids to their contents
+    std::map<spv::Id, const std::string*> includeFiles;
 
     // The stream for outputting warnings and errors.
     SpvBuildLogger* logger;
