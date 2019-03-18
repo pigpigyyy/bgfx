@@ -57,6 +57,7 @@ namespace bgfx
 			Direct3D12,   //!< Direct3D 12.0
 			Gnm,          //!< GNM
 			Metal,        //!< Metal
+			Nvn,          //!< NVN
 			OpenGLES,     //!< OpenGL ES 2.0+
 			OpenGL,       //!< OpenGL 2.1+
 			Vulkan,       //!< Vulkan
@@ -2051,7 +2052,7 @@ namespace bgfx
 	/// Clear internal debug text buffer.
 	///
 	/// @param[in] _attr Background color.
-	/// @param[in] _small Default or 8x8 font.
+	/// @param[in] _small Default 8x16 or 8x8 font.
 	///
 	/// @attention C99 equivalent is `bgfx_dbg_text_clear`.
 	///
@@ -2651,7 +2652,7 @@ namespace bgfx
 		, const Memory* _mem = NULL
 		);
 
-	/// Create frame buffer with size based on backbuffer ratio. Frame buffer will maintain ratio
+	/// Create texture with size based on backbuffer ratio. Texture will maintain ratio
 	/// if back buffer resolution changes.
 	///
 	/// @param[in] _ratio Frame buffer size in respect to back-buffer size. See:
@@ -3261,7 +3262,7 @@ namespace bgfx
 		);
 
 	/// Set view clear flags with different clear color for each
-	/// frame buffer texture. Must use setClearColor to setup clear color
+	/// frame buffer texture. Must use `bgfx::setPaletteColor` to setup clear color
 	/// palette.
 	///
 	/// @param[in] _id View id.
