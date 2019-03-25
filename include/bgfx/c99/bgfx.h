@@ -1208,7 +1208,7 @@ BGFX_C_API void bgfx_set_debug(uint32_t _debug);
  * Clear internal debug text buffer.
  *
  * @param[in] _attr Background color.
- * @param[in] _small Default or 8x8 font.
+ * @param[in] _small Default 8x16 or 8x8 font.
  *
  */
 BGFX_C_API void bgfx_dbg_text_clear(uint8_t _attr, bool _small);
@@ -1781,6 +1781,7 @@ BGFX_C_API bgfx_texture_handle_t bgfx_create_texture_cube(uint16_t _size, bool _
 
 /**
  * Update 2D texture.
+ * @attention It's valid to update only mutable texture. See `bgfx::createTexture2D` for more info.
  *
  * @param[in] _handle Texture handle.
  * @param[in] _layer Layer in texture array.
@@ -1798,6 +1799,7 @@ BGFX_C_API void bgfx_update_texture_2d(bgfx_texture_handle_t _handle, uint16_t _
 
 /**
  * Update 3D texture.
+ * @attention It's valid to update only mutable texture. See `bgfx::createTexture3D` for more info.
  *
  * @param[in] _handle Texture handle.
  * @param[in] _mip Mip level.
@@ -1814,6 +1816,7 @@ BGFX_C_API void bgfx_update_texture_3d(bgfx_texture_handle_t _handle, uint8_t _m
 
 /**
  * Update Cube texture.
+ * @attention It's valid to update only mutable texture. See `bgfx::createTextureCube` for more info.
  *
  * @param[in] _handle Texture handle.
  * @param[in] _layer Layer in texture array.
