@@ -7134,11 +7134,12 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 
 					{
 						bool diffStreamHandles = false;
-						for (uint32_t idx = 0, streamMask = draw.m_streamMask, ntz = bx::uint32_cnttz(streamMask)
+						for (uint32_t idx = 0, streamMask = draw.m_streamMask
 							; 0 != streamMask
-							; streamMask >>= 1, idx += 1, ntz = bx::uint32_cnttz(streamMask)
+							; streamMask >>= 1, idx += 1
 							)
 						{
+							const uint32_t ntz = bx::uint32_cnttz(streamMask);
 							streamMask >>= ntz;
 							idx         += ntz;
 
@@ -7161,11 +7162,12 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 							currentState.m_instanceDataOffset     = draw.m_instanceDataOffset;
 							currentState.m_instanceDataStride     = draw.m_instanceDataStride;
 
-							for (uint32_t idx = 0, streamMask = draw.m_streamMask, ntz = bx::uint32_cnttz(streamMask)
+							for (uint32_t idx = 0, streamMask = draw.m_streamMask
 								; 0 != streamMask
-								; streamMask >>= 1, idx += 1, ntz = bx::uint32_cnttz(streamMask)
+								; streamMask >>= 1, idx += 1
 								)
 							{
+								const uint32_t ntz = bx::uint32_cnttz(streamMask);
 								streamMask >>= ntz;
 								idx         += ntz;
 
@@ -7194,11 +7196,12 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 						if (0 != currentState.m_streamMask)
 						{
 							bool diffStartVertex = false;
-							for (uint32_t idx = 0, streamMask = draw.m_streamMask, ntz = bx::uint32_cnttz(streamMask)
+							for (uint32_t idx = 0, streamMask = draw.m_streamMask
 								; 0 != streamMask
-								; streamMask >>= 1, idx += 1, ntz = bx::uint32_cnttz(streamMask)
+								; streamMask >>= 1, idx += 1
 								)
 							{
+								const uint32_t ntz = bx::uint32_cnttz(streamMask);
 								streamMask >>= ntz;
 								idx         += ntz;
 
@@ -7223,11 +7226,12 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 
 								if (UINT8_MAX != draw.m_streamMask)
 								{
-									for (uint32_t idx = 0, streamMask = draw.m_streamMask, ntz = bx::uint32_cnttz(streamMask)
+									for (uint32_t idx = 0, streamMask = draw.m_streamMask
 										; 0 != streamMask
-										; streamMask >>= 1, idx += 1, ntz = bx::uint32_cnttz(streamMask)
+										; streamMask >>= 1, idx += 1
 										)
 									{
+										const uint32_t ntz = bx::uint32_cnttz(streamMask);
 										streamMask >>= ntz;
 										idx         += ntz;
 
@@ -7256,11 +7260,12 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 						uint32_t numVertices = draw.m_numVertices;
 						if (UINT32_MAX == numVertices)
 						{
-							for (uint32_t idx = 0, streamMask = draw.m_streamMask, ntz = bx::uint32_cnttz(streamMask)
+							for (uint32_t idx = 0, streamMask = draw.m_streamMask
 								; 0 != streamMask
-								; streamMask >>= 1, idx += 1, ntz = bx::uint32_cnttz(streamMask)
+								; streamMask >>= 1, idx += 1
 								)
 							{
+								const uint32_t ntz = bx::uint32_cnttz(streamMask);
 								streamMask >>= ntz;
 								idx         += ntz;
 
