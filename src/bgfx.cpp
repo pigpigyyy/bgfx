@@ -12,9 +12,9 @@
 
 #include "topology.h"
 
-#if BX_PLATFORM_OSX
+#if BX_PLATFORM_OSX || BX_PLATFORM_IOS
 #	include <objc/message.h>
-#endif // BX_PLATFORM_OSX
+#endif // BX_PLATFORM_OSX || BX_PLATFORM_IOS
 
 BX_ERROR_RESULT(BGFX_ERROR_TEXTURE_VALIDATION,  BX_MAKEFOURCC('b', 'g', 0, 1) );
 
@@ -2250,7 +2250,7 @@ namespace bgfx
 		}
 	}
 
-#if BX_PLATFORM_OSX
+#if BX_PLATFORM_OSX || BX_PLATFORM_IOS
 	struct NSAutoreleasePoolScope
 	{
 		NSAutoreleasePoolScope()
@@ -2266,15 +2266,15 @@ namespace bgfx
 
 		id pool;
 	};
-#endif // BX_PLATFORM_OSX
+#endif // BX_PLATFORM_OSX || BX_PLATFORM_IOS
 
 	RenderFrame::Enum Context::renderFrame(int32_t _msecs)
 	{
 		BGFX_PROFILER_SCOPE("bgfx::renderFrame", 0xff2040ff);
 
-#if BX_PLATFORM_OSX
+#if BX_PLATFORM_OSX || BX_PLATFORM_IOS
 		NSAutoreleasePoolScope pool;
-#endif // BX_PLATFORM_OSX
+#endif // BX_PLATFORM_OSX || BX_PLATFORM_IOS
 
 		if (!m_flipAfterRender)
 		{
