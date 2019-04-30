@@ -30,6 +30,7 @@ add_spvtools_unittest(TARGET opt
        dead_branch_elim_test.cpp
        dead_insert_elim_test.cpp
        dead_variable_elim_test.cpp
+       decompose_initialized_variables_test.cpp
        decoration_manager_test.cpp
        def_use_test.cpp
        eliminate_dead_const_test.cpp
@@ -54,6 +55,7 @@ add_spvtools_unittest(TARGET opt
        ir_context_test.cpp
        ir_loader_test.cpp
        iterator_test.cpp
+       legalize_vector_shuffle_test.cpp
        line_debug_info_test.cpp
        local_access_chain_convert_test.cpp
        local_redundancy_elimination_test.cpp

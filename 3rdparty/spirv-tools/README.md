@@ -47,7 +47,7 @@ version.  An API call reports the software version as a C-style string.
 
 * Support for SPIR-V 1.0, 1.1, 1.2, and 1.3
   * Based on SPIR-V syntax described by JSON grammar files in the
-    [SPIRV-Headers](spirv-headers) repository.
+    [SPIRV-Headers](https://github.com/KhronosGroup/SPIRV-Headers) repository.
 * Support for extended instruction sets:
   * GLSL std450 version 1.0 Rev 3
   * OpenCL version 1.0 Rev 2
@@ -276,13 +276,8 @@ installed regardless of your OS:
 
 - [CMake](http://www.cmake.org/): for generating compilation targets.  Version
   2.8.12 or later.
-- [Python](http://www.python.org/): for utility scripts and running the test 
-suite. Version 2 or 3.
-
-We will be moving to Python3 only in the future.  If you are using Python2, you
-will need to install Python-future: 
-```pip install future
-```
+- [Python 3](http://www.python.org/): for utility scripts and running the test
+suite.
 
 SPIRV-Tools is regularly tested with the the following compilers:
 

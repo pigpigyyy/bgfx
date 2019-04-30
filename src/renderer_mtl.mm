@@ -22,6 +22,14 @@ namespace bgfx { namespace mtl
 {
 	static char s_viewName[BGFX_CONFIG_MAX_VIEWS][BGFX_CONFIG_MAX_VIEW_NAME];
 
+	inline void setViewType(ViewId _view, const bx::StringView _str)
+	{
+		if (BX_ENABLED(BGFX_CONFIG_DEBUG_ANNOTATION || BGFX_CONFIG_PROFILER) )
+		{
+			bx::memCopy(&s_viewName[_view][3], _str.getPtr(), _str.getLength() );
+		}
+	}
+
 	struct PrimInfo
 	{
 		MTLPrimitiveType m_type;
@@ -2058,9 +2066,12 @@ namespace bgfx { namespace mtl
 				for (; stream < _numStreams; ++stream)
 				{
 					const VertexDecl& vertexDecl = *_vertexDecls[stream];
+					bool streamUsed = false;
 					for (uint32_t ii = 0; Attrib::Count != program.m_used[ii]; ++ii)
 					{
 						Attrib::Enum attr = Attrib::Enum(program.m_used[ii]);
+						if (attrSet[attr])
+							continue;
 						const uint32_t loc = program.m_attributes[attr];
 
 						uint8_t num;
@@ -2079,11 +2090,13 @@ namespace bgfx { namespace mtl
 							BX_TRACE("attrib: %s format: %d offset: %d", s_attribName[attr], (int)vertexDesc.attributes[loc].format, (int)vertexDesc.attributes[loc].offset);
 
 							attrSet[attr] = true;
+							streamUsed = true;
 						}
 					}
-
-					vertexDesc.layouts[stream+1].stride       = vertexDecl.getStride();
-					vertexDesc.layouts[stream+1].stepFunction = MTLVertexStepFunctionPerVertex;
+					if (streamUsed) {
+						vertexDesc.layouts[stream+1].stride       = vertexDecl.getStride();
+						vertexDesc.layouts[stream+1].stepFunction = MTLVertexStepFunctionPerVertex;
+					}
 				}
 
 				for (uint32_t ii = 0; Attrib::Count != program.m_used[ii]; ++ii)
@@ -2325,12 +2338,11 @@ namespace bgfx { namespace mtl
 		ProgramMtl           m_screenshotBlitProgram;
 		RenderPipelineState  m_screenshotBlitRenderPipelineState;
 
-		CommandBuffer        m_commandBuffer;
-		CommandBuffer        m_prevCommandBuffer;
-		BlitCommandEncoder   m_blitCommandEncoder;
-		RenderCommandEncoder m_renderCommandEncoder;
+		CommandBuffer         m_commandBuffer;
+		BlitCommandEncoder    m_blitCommandEncoder;
+		RenderCommandEncoder  m_renderCommandEncoder;
 		ComputeCommandEncoder m_computeCommandEncoder;
-		FrameBufferHandle    m_renderCommandEncoderFrameBufferHandle;
+		FrameBufferHandle     m_renderCommandEncoderFrameBufferHandle;
 	};
 
 	RendererContextI* rendererCreate(const Init& _init)
@@ -3368,6 +3380,17 @@ namespace bgfx { namespace mtl
 	{
 	}
 
+	uint32_t TimerQueryMtl::begin(uint32_t _resultIdx)
+	{
+		BX_UNUSED(_resultIdx);
+		return 0;
+	}
+
+	void TimerQueryMtl::end(uint32_t _idx)
+	{
+		BX_UNUSED(_idx);
+	}
+
 	static void setTimestamp(void* _data)
 	{
 		*( (int64_t*)_data) = bx::getHPCounter();
@@ -3380,10 +3403,10 @@ namespace bgfx { namespace mtl
 			m_control.consume(1);
 		}
 
-		uint32_t offset = m_control.m_current * 2 + 0;
+		uint32_t offset = m_control.m_current;
 
-		_commandBuffer.addScheduledHandler(setTimestamp, &m_result[offset]);
-		_commandBuffer.addCompletedHandler(setTimestamp, &m_result[offset+1]);
+		_commandBuffer.addScheduledHandler(setTimestamp, &m_result[offset].m_begin);
+		_commandBuffer.addCompletedHandler(setTimestamp, &m_result[offset].m_end);
 		m_control.commit(1);
 	}
 
@@ -3391,9 +3414,9 @@ namespace bgfx { namespace mtl
 	{
 		if (0 != m_control.available() )
 		{
-			uint32_t offset = m_control.m_read * 2;
-			m_begin = m_result[offset+0];
-			m_end   = m_result[offset+1];
+			uint32_t offset = m_control.m_read;
+			m_begin = m_result[offset].m_begin;
+			m_end   = m_result[offset].m_end;
 			m_elapsed = m_end - m_begin;
 
 			m_control.consume(1);
@@ -3553,10 +3576,12 @@ namespace bgfx { namespace mtl
 	{
 		m_cmd.finish(false);
 
-		if (m_commandBuffer == NULL)
+		if (NULL == m_commandBuffer)
 		{
 			m_commandBuffer = m_cmd.alloc();
 		}
+
+		BGFX_MTL_PROFILER_BEGIN_LITERAL("rendererSubmit", kColorFrame);
 
 		int64_t timeBegin = bx::getHPCounter();
 		int64_t captureElapsed = 0;
@@ -3626,12 +3651,14 @@ namespace bgfx { namespace mtl
 
 		if (0 < _render->m_iboffset)
 		{
+			BGFX_PROFILER_SCOPE("bgfx/Update transient index buffer", kColorResource);
 			TransientIndexBuffer* ib = _render->m_transientIb;
 			m_indexBuffers[ib->handle.idx].update(0, bx::strideAlign(_render->m_iboffset,4), ib->data, true);
 		}
 
 		if (0 < _render->m_vboffset)
 		{
+			BGFX_PROFILER_SCOPE("bgfx/Update transient vertex buffer", kColorResource);
 			TransientVertexBuffer* vb = _render->m_transientVb;
 			m_vertexBuffers[vb->handle.idx].update(0, bx::strideAlign(_render->m_vboffset,4), vb->data, true);
 		}
@@ -3679,6 +3706,12 @@ namespace bgfx { namespace mtl
 		uint32_t statsNumIndices = 0;
 		uint32_t statsKeyType[2] = {};
 
+		Profiler<TimerQueryMtl> profiler(
+			  _render
+			, m_gpuTimer
+			, s_viewName
+			);
+
 		m_occlusionQuery.resolve(_render);
 
 		if (0 == (_render->m_debug&BGFX_DEBUG_IFH) )
@@ -3702,17 +3735,28 @@ namespace bgfx { namespace mtl
 				const RenderBind& renderBind = _render->m_renderItemBind[itemIdx];
 				++item;
 
-				if ( viewChanged ||
-					(!isCompute && wasCompute))
+				if (viewChanged
+				|| (!isCompute && wasCompute) )
 				{
 					view = key.m_view;
 					currentProgram = BGFX_INVALID_HANDLE;
+
+					if (item > 1)
+					{
+						profiler.end();
+					}
+
+					BGFX_MTL_PROFILER_END();
+					setViewType(view, "  ");
+					BGFX_MTL_PROFILER_BEGIN(view, kColorView);
+
+					profiler.begin(view);
 
 					viewState.m_rect = _render->m_view[view].m_rect;
 
 					submitBlit(bs, view);
 
-					if ( !isCompute )
+					if (!isCompute)
 					{
 						const Rect& scissorRect = _render->m_view[view].m_scissor;
 						viewHasScissor = !scissorRect.isZero();
@@ -3892,6 +3936,10 @@ namespace bgfx { namespace mtl
 						endEncoding();
 						rce = NULL;
 
+						setViewType(view, "C");
+						BGFX_MTL_PROFILER_END();
+						BGFX_MTL_PROFILER_BEGIN(view, kColorCompute);
+
 						m_computeCommandEncoder = m_commandBuffer.computeCommandEncoder();
 					}
 					else if (viewChanged && BX_ENABLED(BGFX_CONFIG_DEBUG_ANNOTATION) )
@@ -3910,7 +3958,6 @@ namespace bgfx { namespace mtl
 					const RenderCompute& compute = renderItem.compute;
 
 					bool programChanged = false;
-					bool constantsChanged = compute.m_uniformBegin < compute.m_uniformEnd;
 					rendererUpdateUniforms(this, _render->m_uniformBuffer[compute.m_uniformIdx], compute.m_uniformBegin, compute.m_uniformEnd);
 
 					if (key.m_program.idx != currentProgram.idx)
@@ -3926,8 +3973,7 @@ namespace bgfx { namespace mtl
 						}
 
 						m_computeCommandEncoder.setComputePipelineState(currentPso->m_cps);
-						programChanged =
-							constantsChanged = true;
+						programChanged = true;
 					}
 
 					if (isValid(currentProgram)
@@ -3941,13 +3987,10 @@ namespace bgfx { namespace mtl
 							m_computeCommandEncoder.setBuffer(m_uniformBuffer, m_uniformBufferVertexOffset, 0);
 						}
 
-						if (constantsChanged)
+						UniformBuffer* vcb = currentPso->m_vshConstantBuffer;
+						if (NULL != vcb)
 						{
-							UniformBuffer* vcb = currentPso->m_vshConstantBuffer;
-							if (NULL != vcb)
-							{
-								commit(*vcb);
-							}
+							commit(*vcb);
 						}
 
 						viewState.setPredefined<4>(this, view, *currentPso, _render, compute);
@@ -4042,6 +4085,10 @@ namespace bgfx { namespace mtl
 				{
 					wasCompute = false;
 					currentProgram = BGFX_INVALID_HANDLE;
+
+					setViewType(view, " ");
+					BGFX_MTL_PROFILER_END();
+					BGFX_MTL_PROFILER_BEGIN(view, kColorDraw);
 				}
 
 				const RenderDraw& draw = renderItem.draw;
@@ -4186,7 +4233,6 @@ namespace bgfx { namespace mtl
 				}
 
 				bool programChanged = false;
-				bool constantsChanged = draw.m_uniformBegin < draw.m_uniformEnd;
 				rendererUpdateUniforms(this, _render->m_uniformBuffer[draw.m_uniformIdx], draw.m_uniformBegin, draw.m_uniformEnd);
 
 				bool vertexStreamChanged = hasVertexStreamChanged(currentState, draw);
@@ -4230,7 +4276,9 @@ namespace bgfx { namespace mtl
 
 						const uint16_t handle = draw.m_stream[idx].m_handle.idx;
 						const VertexBufferMtl& vb = m_vertexBuffers[handle];
-						const uint16_t decl = !isValid(vb.m_decl) ? draw.m_stream[idx].m_decl.idx : vb.m_decl.idx;
+						const uint16_t decl = isValid(draw.m_stream[idx].m_decl)
+							? draw.m_stream[idx].m_decl.idx
+							: vb.m_decl.idx;
 						const VertexDecl& vertexDecl = m_vertexDecls[decl];
 						const uint32_t stride = vertexDecl.m_stride;
 
@@ -4284,8 +4332,7 @@ namespace bgfx { namespace mtl
 						rce.setVertexBuffer(inst.m_ptr, draw.m_instanceDataOffset, numStreams+1);
 					}
 
-					programChanged =
-						constantsChanged = true;
+					programChanged = true;
 				}
 
 				if (isValid(currentProgram) )
@@ -4306,19 +4353,16 @@ namespace bgfx { namespace mtl
 						rce.setFragmentBuffer(m_uniformBuffer, m_uniformBufferFragmentOffset, 0);
 					}
 
-					if (constantsChanged)
+					UniformBuffer* vcb = currentPso->m_vshConstantBuffer;
+					if (NULL != vcb)
 					{
-						UniformBuffer* vcb = currentPso->m_vshConstantBuffer;
-						if (NULL != vcb)
-						{
-							commit(*vcb);
-						}
-
-						UniformBuffer* fcb = currentPso->m_fshConstantBuffer;
-						if (NULL != fcb)
-						{
-							commit(*fcb);
-						}
+						commit(*vcb);
+					}
+					
+					UniformBuffer* fcb = currentPso->m_fshConstantBuffer;
+					if (NULL != fcb)
+					{
+						commit(*fcb);
 					}
 
 					viewState.setPredefined<4>(this, view, *currentPso, _render, draw);
@@ -4465,6 +4509,10 @@ namespace bgfx { namespace mtl
 			if (wasCompute)
 			{
 				invalidateCompute();
+
+				setViewType(view, "C");
+				BGFX_MTL_PROFILER_END();
+				BGFX_MTL_PROFILER_BEGIN(view, kColorCompute);
 			}
 
 			submitBlit(bs, BGFX_CONFIG_MAX_VIEWS);
@@ -4475,6 +4523,8 @@ namespace bgfx { namespace mtl
 				capture();
 				rce = m_renderCommandEncoder;
 				captureElapsed += bx::getHPCounter();
+
+				profiler.end();
 			}
 		}
 
@@ -4485,6 +4535,8 @@ namespace bgfx { namespace mtl
 				rce.popDebugGroup();
 			}
 		}
+
+		BGFX_MTL_PROFILER_END();
 
 		int64_t timeEnd = bx::getHPCounter();
 		int64_t frameTime = timeEnd - timeBegin;

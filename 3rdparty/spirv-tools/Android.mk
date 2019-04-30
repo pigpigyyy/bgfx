@@ -92,6 +92,7 @@ SPVTOOLS_OPT_SRC_FILES := \
 		source/opt/dead_branch_elim_pass.cpp \
 		source/opt/dead_insert_elim_pass.cpp \
 		source/opt/dead_variable_elimination.cpp \
+		source/opt/decompose_initialized_variables_pass.cpp \
 		source/opt/decoration_manager.cpp \
 		source/opt/def_use_manager.cpp \
 		source/opt/dominator_analysis.cpp \
@@ -119,6 +120,7 @@ SPVTOOLS_OPT_SRC_FILES := \
 		source/opt/instrument_pass.cpp \
 		source/opt/ir_context.cpp \
 		source/opt/ir_loader.cpp \
+                source/opt/legalize_vector_shuffle_pass.cpp \
 		source/opt/licm_pass.cpp \
 		source/opt/local_access_chain_convert_pass.cpp \
 		source/opt/local_redundancy_elimination.cpp \

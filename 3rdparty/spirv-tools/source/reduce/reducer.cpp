@@ -12,21 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "source/reduce/reducer.h"
+
 #include <cassert>
 #include <sstream>
 
+#include "source/reduce/conditional_branch_to_simple_conditional_branch_opportunity_finder.h"
 #include "source/reduce/merge_blocks_reduction_opportunity_finder.h"
 #include "source/reduce/operand_to_const_reduction_opportunity_finder.h"
 #include "source/reduce/operand_to_dominating_id_reduction_opportunity_finder.h"
 #include "source/reduce/operand_to_undef_reduction_opportunity_finder.h"
+#include "source/reduce/remove_block_reduction_opportunity_finder.h"
 #include "source/reduce/remove_function_reduction_opportunity_finder.h"
 #include "source/reduce/remove_opname_instruction_reduction_opportunity_finder.h"
 #include "source/reduce/remove_selection_reduction_opportunity_finder.h"
 #include "source/reduce/remove_unreferenced_instruction_reduction_opportunity_finder.h"
+#include "source/reduce/simple_conditional_branch_to_branch_opportunity_finder.h"
 #include "source/reduce/structured_loop_to_selection_reduction_opportunity_finder.h"
 #include "source/spirv_reducer_options.h"
-
-#include "reducer.h"
 
 namespace spvtools {
 namespace reduce {
@@ -187,7 +190,14 @@ void Reducer::AddDefaultReductionPasses() {
   AddReductionPass(
       spvtools::MakeUnique<RemoveFunctionReductionOpportunityFinder>());
   AddReductionPass(
+      spvtools::MakeUnique<RemoveBlockReductionOpportunityFinder>());
+  AddReductionPass(
       spvtools::MakeUnique<RemoveSelectionReductionOpportunityFinder>());
+  AddReductionPass(
+      spvtools::MakeUnique<
+          ConditionalBranchToSimpleConditionalBranchOpportunityFinder>());
+  AddReductionPass(
+      spvtools::MakeUnique<SimpleConditionalBranchToBranchOpportunityFinder>());
 }
 
 void Reducer::AddReductionPass(

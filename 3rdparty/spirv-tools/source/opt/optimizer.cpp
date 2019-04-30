@@ -224,13 +224,16 @@ Optimizer& Optimizer::RegisterVulkanToWebGPUPasses() {
   return RegisterPass(CreateStripDebugInfoPass())
       .RegisterPass(CreateStripAtomicCounterMemoryPass())
       .RegisterPass(CreateGenerateWebGPUInitializersPass())
+      .RegisterPass(CreateLegalizeVectorShufflePass())
       .RegisterPass(CreateEliminateDeadConstantPass())
       .RegisterPass(CreateFlattenDecorationPass())
       .RegisterPass(CreateAggressiveDCEPass())
       .RegisterPass(CreateDeadBranchElimPass());
 }
 
-Optimizer& Optimizer::RegisterWebGPUToVulkanPasses() { return *this; }
+Optimizer& Optimizer::RegisterWebGPUToVulkanPasses() {
+  return RegisterPass(CreateDecomposeInitializedVariablesPass());
+}
 
 bool Optimizer::RegisterPassesFromFlags(const std::vector<std::string>& flags) {
   for (const auto& flag : flags) {
@@ -466,6 +469,8 @@ bool Optimizer::RegisterPassFromFlag(const std::string& flag) {
     RegisterLegalizationPasses();
   } else if (pass_name == "generate-webgpu-initializers") {
     RegisterPass(CreateGenerateWebGPUInitializersPass());
+  } else if (pass_name == "legalize-vector-shuffle") {
+    RegisterPass(CreateLegalizeVectorShufflePass());
   } else {
     Errorf(consumer(), nullptr, {},
            "Unknown flag '--%s'. Use --help for a list of valid flags",
@@ -526,10 +531,12 @@ bool Optimizer::Run(const uint32_t* original_binary,
     binary_changed = true;
   } else if (status == opt::Pass::Status::SuccessWithoutChange) {
     if (optimized_binary->size() != original_binary_size ||
-        (memcmp(optimized_binary->data(), original_binary, original_binary_size) != 0)) {
+        (memcmp(optimized_binary->data(), original_binary,
+                original_binary_size) != 0)) {
       binary_changed = true;
-      Logf(consumer(), SPV_MSG_WARNING, nullptr, {},
-           "Binary unexpectedly changed despite optimizer saying there was no change");
+      Log(consumer(), SPV_MSG_WARNING, nullptr, {},
+          "Binary unexpectedly changed despite optimizer saying there was no "
+          "change");
     }
   }
 
@@ -854,6 +861,16 @@ Optimizer::PassToken CreateGenerateWebGPUInitializersPass() {
 Optimizer::PassToken CreateFixStorageClassPass() {
   return MakeUnique<Optimizer::PassToken::Impl>(
       MakeUnique<opt::FixStorageClass>());
+}
+
+Optimizer::PassToken CreateLegalizeVectorShufflePass() {
+  return MakeUnique<Optimizer::PassToken::Impl>(
+      MakeUnique<opt::LegalizeVectorShufflePass>());
+}
+
+Optimizer::PassToken CreateDecomposeInitializedVariablesPass() {
+  return MakeUnique<Optimizer::PassToken::Impl>(
+      MakeUnique<opt::DecomposeInitializedVariablesPass>());
 }
 
 }  // namespace spvtools
