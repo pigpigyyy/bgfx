@@ -340,16 +340,16 @@ struct OcornutImguiContext
 		, int32_t _scroll
 		, int _width
 		, int _height
-		, char _inputChar
+		, int _inputChar
 		, bgfx::ViewId _viewId
 		)
 	{
 		m_viewId = _viewId;
 
 		ImGuiIO& io = ImGui::GetIO();
-		if (_inputChar < 0x7f)
+		if (_inputChar >= 0)
 		{
-			io.AddInputCharacter(_inputChar); // ASCII or GTFO! :(
+			io.AddInputCharacter(_inputChar);
 		}
 
 		io.DisplaySize = ImVec2( (float)_width, (float)_height);
@@ -427,7 +427,7 @@ void imguiDestroy()
 	s_ctx.destroy();
 }
 
-void imguiBeginFrame(int32_t _mx, int32_t _my, uint8_t _button, int32_t _scroll, uint16_t _width, uint16_t _height, char _inputChar, bgfx::ViewId _viewId)
+void imguiBeginFrame(int32_t _mx, int32_t _my, uint8_t _button, int32_t _scroll, uint16_t _width, uint16_t _height, int _inputChar, bgfx::ViewId _viewId)
 {
 	s_ctx.beginFrame(_mx, _my, _button, _scroll, _width, _height, _inputChar, _viewId);
 }
