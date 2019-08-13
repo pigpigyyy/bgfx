@@ -763,7 +763,9 @@ namespace bgfx
 					uint32_t ch = line->character;
 					uint8_t attr = line->attribute;
 					if (ch > 0xff)
-						ch = 0;	// todo: render unicode code point , ch > 255)
+					{
+						ch = 0;
+					}
 
 					if (0 != (ch|attr)
 					&& (' ' != ch || 0 != (attr&0xf0) ) )
@@ -882,7 +884,7 @@ namespace bgfx
 
 	const char* s_uniformTypeName[] =
 	{
-		"int1",
+		"sampler1",
 		NULL,
 		"vec4",
 		"mat3",

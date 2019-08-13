@@ -78,8 +78,8 @@ Languages:
 [Tools](https://bkaradzic.github.io/bgfx/tools.html)
 ----------------------------------------------------
 
-Who is using it? #madewithbgfx
-------------------------------
+Who is using it? [#madewithbgfx](https://twitter.com/search?q=%23madewithbgfx&f=live)
+-------------------------------------------------------------------------------------
 
 ## Airmech
 
@@ -208,12 +208,6 @@ multiplayer time challenges, and a track creator.
 target="_blank"><img src="http://img.youtube.com/vi/ckbkQsB6RVY/0.jpg" 
 alt="Go Rally"
 width="640" height="480" border="0" /></a>
-
-## Fiber2D
-
-https://github.com/s1ddok/Fiber2D#fiber2d - Fiber2D - Cross-platform 2D Game
-Engine in pure Swift  
-![Fiber2D Demo Gif](http://imgur.com/CP6d9kT.gif)
 
 ## vg-renderer
 
