@@ -32,7 +32,7 @@ struct PosNormalColorVertex
 
 	static void init()
 	{
-		ms_decl
+		ms_layout
 			.begin()
 			.add(bgfx::Attrib::Position, 3, bgfx::AttribType::Float)
 			.add(bgfx::Attrib::Normal,   3, bgfx::AttribType::Float)
@@ -40,10 +40,10 @@ struct PosNormalColorVertex
 			.end();
 	};
 
-	static bgfx::VertexDecl ms_decl;
+	static bgfx::VertexLayout ms_layout;
 };
 
-bgfx::VertexDecl PosNormalColorVertex::ms_decl;
+bgfx::VertexLayout PosNormalColorVertex::ms_layout;
 
 struct Grid
 {
@@ -480,8 +480,8 @@ uint32_t triangulate(uint8_t* _result, uint32_t _stride, const float* __restrict
 class ExampleMetaballs : public entry::AppI
 {
 public:
-	ExampleMetaballs(const char* _name, const char* _description)
-		: entry::AppI(_name, _description)
+	ExampleMetaballs(const char* _name, const char* _description, const char* _url)
+		: entry::AppI(_name, _description, _url)
 	{
 	}
 
@@ -605,7 +605,7 @@ public:
 			// Allocate 32K vertices in transient vertex buffer.
 			uint32_t maxVertices = (32<<10);
 			bgfx::TransientVertexBuffer tvb;
-			bgfx::allocTransientVertexBuffer(&tvb, maxVertices, PosNormalColorVertex::ms_decl);
+			bgfx::allocTransientVertexBuffer(&tvb, maxVertices, PosNormalColorVertex::ms_layout);
 
 			const uint32_t numSpheres = 16;
 			float sphere[numSpheres][4];
@@ -723,7 +723,7 @@ public:
 							&grid[xoffset                ],
 						};
 
-						uint32_t num = triangulate( (uint8_t*)vertex, PosNormalColorVertex::ms_decl.getStride(), rgb, pos, val, 0.5f);
+						uint32_t num = triangulate( (uint8_t*)vertex, PosNormalColorVertex::ms_layout.getStride(), rgb, pos, val, 0.5f);
 						vertex += num;
 						numVertices += num;
 					}
@@ -795,4 +795,9 @@ public:
 
 } // namespace
 
-ENTRY_IMPLEMENT_MAIN(ExampleMetaballs, "02-metaball", "Rendering with transient buffers and embedding shaders.");
+ENTRY_IMPLEMENT_MAIN(
+	  ExampleMetaballs
+	, "02-metaball"
+	, "Rendering with transient buffers and embedding shaders."
+	, "https://bkaradzic.github.io/bgfx/examples.html#metaballs"
+	);
