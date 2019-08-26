@@ -1377,9 +1377,18 @@ VK_IMPORT_INSTANCE
 				g_caps.deviceId = uint16_t(m_deviceProperties.deviceID);
 
 				g_caps.supported |= ( 0
-					| BGFX_CAPS_TEXTURE_BLIT
+					| BGFX_CAPS_ALPHA_TO_COVERAGE
+					| BGFX_CAPS_BLEND_INDEPENDENT
+					| BGFX_CAPS_COMPUTE
 					| BGFX_CAPS_DRAW_INDIRECT
+					| BGFX_CAPS_FRAGMENT_DEPTH
 					| BGFX_CAPS_INSTANCING
+					| BGFX_CAPS_TEXTURE_3D
+					| BGFX_CAPS_TEXTURE_BLIT
+					| BGFX_CAPS_TEXTURE_COMPARE_ALL
+					| BGFX_CAPS_VERTEX_ATTRIB_HALF
+					| BGFX_CAPS_VERTEX_ATTRIB_UINT10
+					| BGFX_CAPS_VERTEX_ID
 					);
 				g_caps.limits.maxTextureSize     = m_deviceProperties.limits.maxImageDimension2D;
 				g_caps.limits.maxFBAttachments   = bx::min(uint8_t(m_deviceProperties.limits.maxFragmentOutputAttachments), uint8_t(BGFX_CONFIG_MAX_FRAME_BUFFER_ATTACHMENTS) );
@@ -2301,19 +2310,16 @@ VK_IMPORT_DEVICE
 				pi.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
 				pi.pNext = NULL;
 				pi.waitSemaphoreCount = 0;
-				pi.pWaitSemaphores    = NULL; //&m_presentDone[0];
+				pi.pWaitSemaphores    = NULL;
 				pi.swapchainCount = 1;
 				pi.pSwapchains    = &m_swapchain;
 				pi.pImageIndices  = &m_backBufferColorIdx;
 				pi.pResults       = NULL;
 				VkResult result = vkQueuePresentKHR(m_queueGraphics, &pi);
-				if (VK_ERROR_OUT_OF_DATE_KHR == result || VK_SUBOPTIMAL_KHR == result)
+				if (VK_ERROR_OUT_OF_DATE_KHR == result
+				||  VK_SUBOPTIMAL_KHR        == result)
 				{
 					m_needToRefreshSwapchain = true;
-				}
-				else
-				{
-					VK_CHECK(result);
 				}
 			}
 		}
@@ -5714,7 +5720,7 @@ VK_DESTROY
 		uint8_t primIndex = uint8_t(primType >> BGFX_STATE_PT_SHIFT);
 		PrimInfo prim = s_primInfo[primIndex];
 
-		bool wasCompute = false;
+		bool wasCompute     = false;
 		bool viewHasScissor = false;
 		bool restoreScissor = false;
 		Rect viewScissorRect;
@@ -5730,21 +5736,20 @@ VK_DESTROY
 		uint32_t statsKeyType[2] = {};
 
 		VkSemaphore renderWait = m_presentDone[m_backBufferColorIdx];
-		VkResult result = vkAcquireNextImageKHR(m_device
-				, m_swapchain
-				, UINT64_MAX
-				, renderWait
-				, VK_NULL_HANDLE
-				, &m_backBufferColorIdx
-				);
-		if (VK_ERROR_OUT_OF_DATE_KHR == result || VK_SUBOPTIMAL_KHR == result)
+		VkResult result = vkAcquireNextImageKHR(
+			  m_device
+			, m_swapchain
+			, UINT64_MAX
+			, renderWait
+			, VK_NULL_HANDLE
+			, &m_backBufferColorIdx
+			);
+
+		if (VK_ERROR_OUT_OF_DATE_KHR == result
+		||  VK_SUBOPTIMAL_KHR        == result)
 		{
 			m_needToRefreshSwapchain = true;
 			return;
-		}
-		else
-		{
-			VK_CHECK(result);
 		}
 
 //		const uint64_t f0 = BGFX_STATE_BLEND_FUNC(BGFX_STATE_BLEND_FACTOR, BGFX_STATE_BLEND_FACTOR);
