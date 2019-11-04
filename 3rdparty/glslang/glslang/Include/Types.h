@@ -79,6 +79,7 @@ struct TSampler {   // misnomer now; includes images, textures without sampler, 
     bool         ms : 1;
     bool      image : 1;  // image, combined should be false
     bool   combined : 1;  // true means texture is combined with a sampler, false means texture with no sampler
+    bool    sampler : 1;  // true means a pure sampler, other fields should be clear()
 #ifdef ENABLE_HLSL
     unsigned int vectorSize : 3;  // vector return type size.
     unsigned int getVectorSize() const { return vectorSize; }
@@ -105,8 +106,6 @@ struct TSampler {   // misnomer now; includes images, textures without sampler, 
     bool isRect()        const { return false; }
     bool isSubpass()     const { return false; }
     bool isCombined()    const { return true; }
-    bool isPureSampler() const { return false; }
-    bool isTexture()     const { return false; }
     bool isImage()       const { return false; }
     bool isImageClass()  const { return false; }
     bool isMultiSample() const { return false; }
@@ -114,7 +113,6 @@ struct TSampler {   // misnomer now; includes images, textures without sampler, 
     void setExternal(bool e) { }
     bool isYuv()         const { return false; }
 #else
-    bool    sampler : 1;  // true means a pure sampler, other fields should be clear()
     bool   external : 1;  // GL_OES_EGL_image_external
     bool        yuv : 1;  // GL_EXT_YUV_target
     // Some languages support structures as sample results.  Storing the whole structure in the
@@ -125,8 +123,6 @@ struct TSampler {   // misnomer now; includes images, textures without sampler, 
     bool isRect()        const { return dim == EsdRect; }
     bool isSubpass()     const { return dim == EsdSubpass; }
     bool isCombined()    const { return combined; }
-    bool isPureSampler() const { return sampler; }
-    bool isTexture()     const { return !sampler && !image; }
     bool isImage()       const { return image && !isSubpass(); }
     bool isImageClass()  const { return image; }
     bool isMultiSample() const { return ms; }
@@ -134,7 +130,12 @@ struct TSampler {   // misnomer now; includes images, textures without sampler, 
     void setExternal(bool e) { external = e; }
     bool isYuv()         const { return yuv; }
 #endif
+    bool isTexture()     const { return !sampler && !image; }
+    bool isPureSampler() const { return sampler; }
+
     void setCombined(bool c) { combined = c; }
+    void setBasicType(TBasicType t) { type = t; }
+    TBasicType getBasicType()  const { return type; }
     bool isShadow()      const { return shadow; }
     bool isArrayed()     const { return arrayed; }
 
@@ -147,8 +148,8 @@ struct TSampler {   // misnomer now; includes images, textures without sampler, 
         ms = false;
         image = false;
         combined = false;
-#ifndef GLSLANG_WEB
         sampler = false;
+#ifndef GLSLANG_WEB
         external = false;
         yuv = false;
 #endif
@@ -195,6 +196,14 @@ struct TSampler {   // misnomer now; includes images, textures without sampler, 
         ms = m;
     }
 
+    // make a pure sampler, no texture, no image, nothing combined, the 'sampler' keyword
+    void setPureSampler(bool s)
+    {
+        clear();
+        sampler = true;
+        shadow = s;
+    }
+
 #ifndef GLSLANG_WEB
     // make a subpass input attachment
     void setSubpass(TBasicType t, bool m = false)
@@ -204,14 +213,6 @@ struct TSampler {   // misnomer now; includes images, textures without sampler, 
         image = true;
         dim = EsdSubpass;
         ms = m;
-    }
-
-    // make a pure sampler, no texture, no image, nothing combined, the 'sampler' keyword
-    void setPureSampler(bool s)
-    {
-        clear();
-        sampler = true;
-        shadow = s;
     }
 #endif
 
@@ -527,6 +528,7 @@ public:
 
     void clearMemory()
     {
+#ifndef GLSLANG_WEB
         coherent     = false;
         devicecoherent = false;
         queuefamilycoherent = false;
@@ -537,6 +539,7 @@ public:
         restrict     = false;
         readonly     = false;
         writeonly    = false;
+#endif
     }
 
     const char*         semanticName;
@@ -549,16 +552,6 @@ public:
     bool centroid     : 1;
     bool smooth       : 1;
     bool flat         : 1;
-    bool coherent     : 1;
-    bool devicecoherent : 1;
-    bool queuefamilycoherent : 1;
-    bool workgroupcoherent : 1;
-    bool subgroupcoherent  : 1;
-    bool nonprivate   : 1;
-    bool volatil      : 1;
-    bool restrict     : 1;
-    bool readonly     : 1;
-    bool writeonly    : 1;
     // having a constant_id is not sufficient: expressions have no id, but are still specConstant
     bool specConstant : 1;
     bool nonUniform   : 1;
@@ -566,6 +559,9 @@ public:
 #ifdef GLSLANG_WEB
     bool isWriteOnly() const { return false; }
     bool isReadOnly() const { return false; }
+    bool isRestrict() const { return false; }
+    bool isCoherent() const { return false; }
+    bool isVolatile() const { return false; }
     bool isSample() const { return false; }
     bool isMemory() const { return false; }
     bool isMemoryQualifierImageAndSSBOOnly() const { return false; }
@@ -587,8 +583,21 @@ public:
     bool perTaskNV : 1;
     bool patch        : 1;
     bool sample       : 1;
+    bool restrict     : 1;
+    bool readonly     : 1;
+    bool writeonly    : 1;
+    bool coherent     : 1;
+    bool volatil      : 1;
+    bool devicecoherent : 1;
+    bool queuefamilycoherent : 1;
+    bool workgroupcoherent : 1;
+    bool subgroupcoherent  : 1;
+    bool nonprivate   : 1;
     bool isWriteOnly() const { return writeonly; }
     bool isReadOnly() const { return readonly; }
+    bool isRestrict() const { return restrict; }
+    bool isCoherent() const { return coherent; }
+    bool isVolatile() const { return volatil; }
     bool isSample() const { return sample; }
     bool isMemory() const
     {
@@ -779,8 +788,8 @@ public:
     {
         layoutLocation = layoutLocationEnd;
         layoutComponent = layoutComponentEnd;
-        layoutIndex = layoutIndexEnd;
 #ifndef GLSLANG_WEB
+        layoutIndex = layoutIndexEnd;
         clearStreamLayout();
         clearXfbLayout();
 #endif
@@ -885,7 +894,9 @@ public:
 
         layoutSet = layoutSetEnd;
         layoutBinding = layoutBindingEnd;
+#ifndef GLSLANG_WEB
         layoutAttachment = layoutAttachmentEnd;
+#endif
     }
 
     bool hasMatrix() const
@@ -922,6 +933,7 @@ public:
     bool hasOffset() const { return false; }
     bool isNonPerspective() const { return false; }
     bool hasIndex() const { return false; }
+    unsigned getIndex() const { return 0; }
     bool hasComponent() const { return false; }
     bool hasStream() const { return false; }
     bool hasFormat() const { return false; }
@@ -946,6 +958,7 @@ public:
     {
         return layoutIndex != layoutIndexEnd;
     }
+    unsigned getIndex() const { return layoutIndex; }
     bool hasComponent() const
     {
         return layoutComponent != layoutComponentEnd;
@@ -1195,6 +1208,7 @@ struct TShaderQualifiers {
     TVertexOrder order;
     bool pointMode;
     int localSize[3];         // compute shader
+    bool localSizeNotDefault[3];        // compute shader
     int localSizeSpecId[3];   // compute shader specialization id for gl_WorkGroupSize
 #ifndef GLSLANG_WEB
     bool earlyFragmentTests;  // fragment input
@@ -1225,6 +1239,9 @@ struct TShaderQualifiers {
         localSize[0] = 1;
         localSize[1] = 1;
         localSize[2] = 1;
+        localSizeNotDefault[0] = false;
+        localSizeNotDefault[1] = false;
+        localSizeNotDefault[2] = false;
         localSizeSpecId[0] = TQualifier::layoutNotSet;
         localSizeSpecId[1] = TQualifier::layoutNotSet;
         localSizeSpecId[2] = TQualifier::layoutNotSet;
@@ -1271,6 +1288,9 @@ struct TShaderQualifiers {
         for (int i = 0; i < 3; ++i) {
             if (src.localSize[i] > 1)
                 localSize[i] = src.localSize[i];
+        }
+        for (int i = 0; i < 3; ++i) {
+            localSizeNotDefault[i] = src.localSizeNotDefault[i] || localSizeNotDefault[i];
         }
         for (int i = 0; i < 3; ++i) {
             if (src.localSizeSpecId[i] != TQualifier::layoutNotSet)
@@ -1433,11 +1453,18 @@ public:
                                     }
                                     typeName = NewPoolTString(p.userDef->getTypeName().c_str());
                                 }
-                                if (p.isCoopmat() && p.basicType == EbtFloat &&
-                                    p.typeParameters && p.typeParameters->getNumDims() > 0 &&
-                                    p.typeParameters->getDimSize(0) == 16) {
-                                    basicType = EbtFloat16;
-                                    qualifier.precision = EpqNone;
+                                if (p.isCoopmat() && p.typeParameters && p.typeParameters->getNumDims() > 0) {
+                                    int numBits = p.typeParameters->getDimSize(0);
+                                    if (p.basicType == EbtFloat && numBits == 16) {
+                                        basicType = EbtFloat16;
+                                        qualifier.precision = EpqNone;
+                                    } else if (p.basicType == EbtUint && numBits == 8) {
+                                        basicType = EbtUint8;
+                                        qualifier.precision = EpqNone;
+                                    } else if (p.basicType == EbtInt && numBits == 8) {
+                                        basicType = EbtInt8;
+                                        qualifier.precision = EpqNone;
+                                    }
                                 }
                             }
     // for construction of sampler types
@@ -1654,6 +1681,8 @@ public:
     virtual bool isImage()   const { return basicType == EbtSampler && getSampler().isImage(); }
     virtual bool isSubpass() const { return basicType == EbtSampler && getSampler().isSubpass(); }
     virtual bool isTexture() const { return basicType == EbtSampler && getSampler().isTexture(); }
+    // Check the block-name convention of creating a block without populating it's members:
+    virtual bool isUnusableName() const { return isStruct() && structure == nullptr; }
     virtual bool isParameterized()  const { return typeParameters != nullptr; }
 #ifdef GLSLANG_WEB
     bool isAtomic() const { return false; }
@@ -1904,6 +1933,7 @@ public:
         case EbtFloat:             return "float";
         case EbtInt:               return "int";
         case EbtUint:              return "uint";
+        case EbtSampler:           return "sampler/image";
 #ifndef GLSLANG_WEB
         case EbtVoid:              return "void";
         case EbtDouble:            return "double";
@@ -1916,7 +1946,6 @@ public:
         case EbtUint64:            return "uint64_t";
         case EbtBool:              return "bool";
         case EbtAtomicUint:        return "atomic_uint";
-        case EbtSampler:           return "sampler/image";
         case EbtStruct:            return "structure";
         case EbtBlock:             return "block";
         case EbtAccStructNV:       return "accelerationStructureNV";
@@ -2177,7 +2206,8 @@ public:
     const TTypeList* getStruct() const { assert(isStruct()); return structure; }
     void setStruct(TTypeList* s) { assert(isStruct()); structure = s; }
     TTypeList* getWritableStruct() const { assert(isStruct()); return structure; }  // This should only be used when known to not be sharing with other threads
-
+    void setBasicType(const TBasicType& t) { basicType = t; }
+    
     int computeNumComponents() const
     {
         int components = 0;
@@ -2301,9 +2331,23 @@ public:
     // an OK function parameter
     bool coopMatParameterOK(const TType& right) const
     {
-        return isCoopMat() && right.isCoopMat() &&
+        return isCoopMat() && right.isCoopMat() && (getBasicType() == right.getBasicType()) &&
                typeParameters == nullptr && right.typeParameters != nullptr;
     }
+
+    bool sameCoopMatBaseType(const TType &right) const {
+        bool rv = coopmat && right.coopmat;
+        if (getBasicType() == EbtFloat || getBasicType() == EbtFloat16)
+            rv = right.getBasicType() == EbtFloat || right.getBasicType() == EbtFloat16;
+        else if (getBasicType() == EbtUint || getBasicType() == EbtUint8)
+            rv = right.getBasicType() == EbtUint || right.getBasicType() == EbtUint8;
+        else if (getBasicType() == EbtInt || getBasicType() == EbtInt8)
+            rv = right.getBasicType() == EbtInt || right.getBasicType() == EbtInt8;
+        else
+            rv = false;
+        return rv;
+    }
+
 
     // See if two types match in all ways (just the actual type, not qualification)
     bool operator==(const TType& right) const

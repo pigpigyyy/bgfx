@@ -325,29 +325,36 @@ void InstrumentPass::CloneSameBlockOps(
     std::unordered_map<uint32_t, uint32_t>* same_blk_post,
     std::unordered_map<uint32_t, Instruction*>* same_blk_pre,
     BasicBlock* block_ptr) {
-  (*inst)->ForEachInId(
-      [&same_blk_post, &same_blk_pre, &block_ptr, this](uint32_t* iid) {
-        const auto map_itr = (*same_blk_post).find(*iid);
-        if (map_itr == (*same_blk_post).end()) {
-          const auto map_itr2 = (*same_blk_pre).find(*iid);
-          if (map_itr2 != (*same_blk_pre).end()) {
-            // Clone pre-call same-block ops, map result id.
-            const Instruction* in_inst = map_itr2->second;
-            std::unique_ptr<Instruction> sb_inst(in_inst->Clone(context()));
-            CloneSameBlockOps(&sb_inst, same_blk_post, same_blk_pre, block_ptr);
-            const uint32_t rid = sb_inst->result_id();
-            const uint32_t nid = this->TakeNextId();
-            get_decoration_mgr()->CloneDecorations(rid, nid);
-            sb_inst->SetResultId(nid);
-            (*same_blk_post)[rid] = nid;
-            *iid = nid;
-            block_ptr->AddInstruction(std::move(sb_inst));
-          }
-        } else {
-          // Reset same-block op operand.
-          *iid = map_itr->second;
-        }
-      });
+  bool changed = false;
+  (*inst)->ForEachInId([&same_blk_post, &same_blk_pre, &block_ptr, &changed,
+                        this](uint32_t* iid) {
+    const auto map_itr = (*same_blk_post).find(*iid);
+    if (map_itr == (*same_blk_post).end()) {
+      const auto map_itr2 = (*same_blk_pre).find(*iid);
+      if (map_itr2 != (*same_blk_pre).end()) {
+        // Clone pre-call same-block ops, map result id.
+        const Instruction* in_inst = map_itr2->second;
+        std::unique_ptr<Instruction> sb_inst(in_inst->Clone(context()));
+        const uint32_t rid = sb_inst->result_id();
+        const uint32_t nid = this->TakeNextId();
+        get_decoration_mgr()->CloneDecorations(rid, nid);
+        sb_inst->SetResultId(nid);
+        get_def_use_mgr()->AnalyzeInstDefUse(&*sb_inst);
+        (*same_blk_post)[rid] = nid;
+        *iid = nid;
+        changed = true;
+        CloneSameBlockOps(&sb_inst, same_blk_post, same_blk_pre, block_ptr);
+        block_ptr->AddInstruction(std::move(sb_inst));
+      }
+    } else {
+      // Reset same-block op operand if necessary
+      if (*iid != map_itr->second) {
+        *iid = map_itr->second;
+        changed = true;
+      }
+    }
+  });
+  if (changed) get_def_use_mgr()->AnalyzeInstUse(&**inst);
 }
 
 void InstrumentPass::UpdateSucceedingPhis(
@@ -451,15 +458,7 @@ analysis::Type* InstrumentPass::GetUintRuntimeArrayType(uint32_t width) {
 void InstrumentPass::AddStorageBufferExt() {
   if (storage_buffer_ext_defined_) return;
   if (!get_feature_mgr()->HasExtension(kSPV_KHR_storage_buffer_storage_class)) {
-    const std::string ext_name("SPV_KHR_storage_buffer_storage_class");
-    const auto num_chars = ext_name.size();
-    // Compute num words, accommodate the terminating null character.
-    const auto num_words = (num_chars + 1 + 3) / 4;
-    std::vector<uint32_t> ext_words(num_words, 0u);
-    std::memcpy(ext_words.data(), ext_name.data(), num_chars);
-    context()->AddExtension(std::unique_ptr<Instruction>(
-        new Instruction(context(), SpvOpExtension, 0u, 0u,
-                        {{SPV_OPERAND_TYPE_LITERAL_STRING, ext_words}})));
+    context()->AddExtension("SPV_KHR_storage_buffer_storage_class");
   }
   storage_buffer_ext_defined_ = true;
 }

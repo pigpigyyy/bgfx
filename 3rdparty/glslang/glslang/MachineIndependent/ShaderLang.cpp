@@ -288,6 +288,11 @@ void InitializeStageSymbolTable(TBuiltInParseables& builtInParseables, int versi
                                 EShLanguage language, EShSource source, TInfoSink& infoSink, TSymbolTable** commonTable,
                                 TSymbolTable** symbolTables)
 {
+#ifdef GLSLANG_WEB
+    profile = EEsProfile;
+    version = 310;
+#endif
+
     (*symbolTables[language]).adoptLevels(*commonTable[CommonIndex(profile, language)]);
     InitializeSymbolTable(builtInParseables.getStageString(language), version, profile, spvVersion, language, source,
                           infoSink, *symbolTables[language]);
@@ -304,6 +309,11 @@ void InitializeStageSymbolTable(TBuiltInParseables& builtInParseables, int versi
 //
 bool InitializeSymbolTables(TInfoSink& infoSink, TSymbolTable** commonTable,  TSymbolTable** symbolTables, int version, EProfile profile, const SpvVersion& spvVersion, EShSource source)
 {
+#ifdef GLSLANG_WEB
+    profile = EEsProfile;
+    version = 310;
+#endif
+
     std::unique_ptr<TBuiltInParseables> builtInParseables(CreateBuiltInParseables(infoSink, source));
 
     if (builtInParseables == nullptr)
@@ -341,6 +351,7 @@ bool InitializeSymbolTables(TInfoSink& infoSink, TSymbolTable** commonTable,  TS
         (profile == EEsProfile && version >= 310))
         InitializeStageSymbolTable(*builtInParseables, version, profile, spvVersion, EShLangGeometry, source,
                                    infoSink, commonTable, symbolTables);
+#endif
 
     // check for compute
     if ((profile != EEsProfile && version >= 420) ||
@@ -375,7 +386,6 @@ bool InitializeSymbolTables(TInfoSink& infoSink, TSymbolTable** commonTable,  TS
         (profile == EEsProfile && version >= 320))
         InitializeStageSymbolTable(*builtInParseables, version, profile, spvVersion, EShLangTaskNV, source,
                                    infoSink, commonTable, symbolTables);
-#endif
 
     return true;
 }
@@ -646,14 +656,9 @@ bool DeduceVersionProfile(TInfoSink& infoSink, EShLanguage stage, bool versionNo
     if (spvVersion.spv != 0) {
         switch (profile) {
         case EEsProfile:
-            if (spvVersion.vulkan > 0 && version < 310) {
+            if (version < 310) {
                 correct = false;
-                infoSink.info.message(EPrefixError, "#version: ES shaders for Vulkan SPIR-V require version 310 or higher");
-                version = 310;
-            }
-            if (spvVersion.openGl >= 100) {
-                correct = false;
-                infoSink.info.message(EPrefixError, "#version: ES shaders for OpenGL SPIR-V are not supported");
+                infoSink.info.message(EPrefixError, "#version: ES shaders for SPIR-V require version 310 or higher");
                 version = 310;
             }
             break;
@@ -876,6 +881,11 @@ bool ProcessDeferred(
 
     bool goodVersion = DeduceVersionProfile(compiler->infoSink, stage,
                                             versionNotFirst, defaultVersion, source, version, profile, spvVersion);
+#ifdef GLSLANG_WEB
+    profile = EEsProfile;
+    version = 310;
+#endif
+
     bool versionWillBeError = (versionNotFound || (profile == EEsProfile && version >= 300 && versionNotFirst));
 #ifndef GLSLANG_WEB
     bool warnVersionNotFirst = false;
@@ -2053,6 +2063,9 @@ bool TProgram::buildReflection(int opts)
 
 unsigned TProgram::getLocalSize(int dim) const                        { return reflection->getLocalSize(dim); }
 int TProgram::getReflectionIndex(const char* name) const              { return reflection->getIndex(name); }
+int TProgram::getReflectionPipeIOIndex(const char* name, const bool inOrOut) const
+                                                                      { return reflection->getPipeIOIndex(name, inOrOut); }
+
 int TProgram::getNumUniformVariables() const                          { return reflection->getNumUniforms(); }
 const TObjectReflection& TProgram::getUniform(int index) const        { return reflection->getUniform(index); }
 int TProgram::getNumUniformBlocks() const                             { return reflection->getNumUniformBlocks(); }

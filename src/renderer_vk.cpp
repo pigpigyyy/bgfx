@@ -216,7 +216,7 @@ VK_IMPORT_DEVICE
 		{ VK_FORMAT_R32G32B32A32_SFLOAT,       VK_FORMAT_R32G32B32A32_SFLOAT,      VK_FORMAT_UNDEFINED,           VK_FORMAT_UNDEFINED                }, // RGBA32F
 		{ VK_FORMAT_B5G6R5_UNORM_PACK16,       VK_FORMAT_B5G6R5_UNORM_PACK16,      VK_FORMAT_UNDEFINED,           VK_FORMAT_UNDEFINED                }, // R5G6B5
 		{ VK_FORMAT_B4G4R4A4_UNORM_PACK16,     VK_FORMAT_B4G4R4A4_UNORM_PACK16,    VK_FORMAT_UNDEFINED,           VK_FORMAT_UNDEFINED                }, // RGBA4
-		{ VK_FORMAT_B5G5R5A1_UNORM_PACK16,     VK_FORMAT_B5G5R5A1_UNORM_PACK16,    VK_FORMAT_UNDEFINED,           VK_FORMAT_UNDEFINED                }, // RGB5A1
+		{ VK_FORMAT_A1R5G5B5_UNORM_PACK16,     VK_FORMAT_A1R5G5B5_UNORM_PACK16,    VK_FORMAT_UNDEFINED,           VK_FORMAT_UNDEFINED                }, // RGB5A1
 		{ VK_FORMAT_A2R10G10B10_UNORM_PACK32,  VK_FORMAT_A2R10G10B10_UNORM_PACK32, VK_FORMAT_UNDEFINED,           VK_FORMAT_UNDEFINED                }, // RGB10A2
 		{ VK_FORMAT_B10G11R11_UFLOAT_PACK32,   VK_FORMAT_B10G11R11_UFLOAT_PACK32,  VK_FORMAT_UNDEFINED,           VK_FORMAT_UNDEFINED                }, // RG11B10F
 		{ VK_FORMAT_UNDEFINED,                 VK_FORMAT_UNDEFINED,                VK_FORMAT_UNDEFINED,           VK_FORMAT_UNDEFINED                }, // UnknownDepth
@@ -2145,6 +2145,7 @@ VK_IMPORT_DEVICE
 				bx::snprintf(s_viewName[ii], BGFX_CONFIG_MAX_VIEW_NAME_RESERVED+1, "%3d   ", ii);
 			}
 
+			g_internalData.context = m_device;
 			return true;
 
 		error:
@@ -2619,13 +2620,14 @@ VK_IMPORT_DEVICE
 			uint32_t samplerFlags = (uint32_t)(texture.m_flags & BGFX_SAMPLER_BITS_MASK);
 			VkSampler sampler = getSampler(samplerFlags, 1);
 
+			const uint32_t size = bx::strideAlign(program.m_vsh->m_size, align);
 			uint32_t bufferOffset = scratchBuffer.m_pos;
 			VkDescriptorBufferInfo bufferInfo;
 			bufferInfo.buffer = scratchBuffer.m_buffer;
 			bufferInfo.offset = 0;
-			bufferInfo.range  = bx::strideAlign(program.m_vsh->m_size, align);
+			bufferInfo.range  = size;
 			bx::memCopy(&scratchBuffer.m_data[scratchBuffer.m_pos], m_vsScratch, program.m_vsh->m_size);
-			scratchBuffer.m_pos += bufferInfo.range;
+			scratchBuffer.m_pos += size;
 
 			VkWriteDescriptorSet wds[3];
 			wds[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -2758,6 +2760,49 @@ VK_IMPORT_DEVICE
 					VK_CHECK(vkDeviceWaitIdle(m_device) );
 					releaseSwapchainFramebuffer();
 					releaseSwapchain();
+
+					uint32_t numPresentModes(10);
+					VkPresentModeKHR presentModes[10];
+					vkGetPhysicalDeviceSurfacePresentModesKHR(m_physicalDevice, m_surface, &numPresentModes, presentModes);
+
+					uint32_t presentModeIdx = numPresentModes;
+					static const VkPresentModeKHR preferredPresentMode[] =
+					{
+						VK_PRESENT_MODE_FIFO_KHR,
+						VK_PRESENT_MODE_FIFO_RELAXED_KHR,
+						VK_PRESENT_MODE_MAILBOX_KHR,
+						VK_PRESENT_MODE_IMMEDIATE_KHR,
+					};
+					static const bool hasVsync[] = { true, true, true, false };
+					BX_STATIC_ASSERT(BX_COUNTOF(preferredPresentMode) == BX_COUNTOF(hasVsync) );
+
+					const bool vsync = !!(flags & BGFX_RESET_VSYNC);
+
+					for (uint32_t ii = 0; ii < BX_COUNTOF(preferredPresentMode); ++ii)
+					{
+						for (uint32_t jj = 0; jj < numPresentModes; ++jj)
+						{
+							if (presentModes[jj] == preferredPresentMode[ii]
+							&&  vsync == hasVsync[ii])
+							{
+								presentModeIdx = jj;
+								BX_TRACE("present mode: %d", preferredPresentMode[ii]);
+								break;
+							}
+						}
+
+						if (presentModeIdx < numPresentModes)
+						{
+							break;
+						}
+					}
+
+					if (presentModeIdx == numPresentModes)
+					{
+						presentModeIdx = 0;
+					}
+
+					m_sci.presentMode = presentModes[presentModeIdx];
 
 					VkSurfaceCapabilitiesKHR surfaceCapabilities;
 					VK_CHECK(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(m_physicalDevice, m_surface, &surfaceCapabilities) );
@@ -3072,7 +3117,7 @@ VK_IMPORT_DEVICE
 				: VK_POLYGON_MODE_FILL
 				;
 			_desc.cullMode  = s_cullMode[cull];
-			_desc.frontFace = VK_FRONT_FACE_CLOCKWISE;
+			_desc.frontFace = (_state&BGFX_STATE_FRONT_CCW) ? VK_FRONT_FACE_COUNTER_CLOCKWISE : VK_FRONT_FACE_CLOCKWISE;
 			_desc.depthBiasEnable = VK_FALSE;
 			_desc.depthBiasConstantFactor = 0.0f;
 			_desc.depthBiasClamp          = 0.0f;
@@ -3278,6 +3323,7 @@ VK_IMPORT_DEVICE
 		VkSampler getSampler(uint32_t _samplerFlags, uint32_t _mipLevels)
 		{
 			bx::HashMurmur2A hash;
+			hash.begin();
 			hash.add(_samplerFlags);
 			hash.add(_mipLevels);
 			uint32_t hashKey = hash.end();
@@ -5148,8 +5194,8 @@ VK_DESTROY
 			VkBufferImageCopy* bufferCopyInfo = (VkBufferImageCopy*)BX_ALLOC(g_allocator, sizeof(VkBufferImageCopy) * numSrd);
 			for (uint32_t ii = 0; ii < numSrd; ++ii)
 			{
-				uint32_t idealWidth  = m_width  >> imageInfos[ii].mipLevel;
-				uint32_t idealHeight = m_height >> imageInfos[ii].mipLevel;
+				uint32_t idealWidth  = bx::max<uint32_t>(1, m_width  >> imageInfos[ii].mipLevel);
+				uint32_t idealHeight = bx::max<uint32_t>(1, m_height >> imageInfos[ii].mipLevel);
 				bufferCopyInfo[ii].bufferOffset      = totalMemSize;
 				bufferCopyInfo[ii].bufferRowLength   = 0; // assume that image data are tightly aligned
 				bufferCopyInfo[ii].bufferImageHeight = 0; // assume that image data are tightly aligned
@@ -5471,7 +5517,7 @@ VK_DESTROY
 		void* directAccessPtr = NULL;
 		VK_CHECK(vkBindBufferMemory(device, stagingBuffer, stagingDeviceMem, 0));
 		VK_CHECK(vkMapMemory(device, stagingDeviceMem, 0, ma.allocationSize, 0, (void**)&directAccessPtr));
-		bx::memCopy(directAccessPtr, _mem->data, bci.size);
+		bx::memCopy(directAccessPtr, _mem->data, size_t(bci.size));
 		vkUnmapMemory(device, stagingDeviceMem);
 
 		const uint32_t bpp    = bimg::getBitsPerPixel(bimg::TextureFormat::Enum(m_textureFormat) );
