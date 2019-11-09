@@ -99,6 +99,8 @@ void TransformationCompositeExtract::Apply(
 
   fuzzerutil::UpdateModuleIdBound(context, message_.fresh_id());
 
+  context->InvalidateAnalysesExceptFor(opt::IRContext::Analysis::kAnalysisNone);
+
   // Add the fact that the id storing the extracted element is synonymous with
   // the index into the structure.
   std::vector<uint32_t> indices;
@@ -106,11 +108,11 @@ void TransformationCompositeExtract::Apply(
     indices.push_back(an_index);
   }
   protobufs::DataDescriptor data_descriptor_for_extracted_element =
-      MakeDataDescriptor(message_.composite_id(), std::move(indices), 1);
+      MakeDataDescriptor(message_.composite_id(), std::move(indices));
   protobufs::DataDescriptor data_descriptor_for_result_id =
-      MakeDataDescriptor(message_.fresh_id(), {}, 1);
+      MakeDataDescriptor(message_.fresh_id(), {});
   fact_manager->AddFactDataSynonym(data_descriptor_for_extracted_element,
-                                   data_descriptor_for_result_id);
+                                   data_descriptor_for_result_id, context);
 }
 
 protobufs::Transformation TransformationCompositeExtract::ToMessage() const {
