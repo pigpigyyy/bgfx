@@ -894,13 +894,12 @@ namespace bgfx { namespace mtl
 
 		void overrideInternal(TextureHandle _handle, uintptr_t _ptr) override
 		{
-			BX_UNUSED(_handle, _ptr);
+			m_textures[_handle.idx].overrideInternal(_ptr);
 		}
 
 		uintptr_t getInternal(TextureHandle _handle) override
 		{
-			BX_UNUSED(_handle);
-			return 0;
+			return uintptr_t(id<MTLTexture>(m_textures[_handle.idx].m_ptr));
 		}
 
 		void destroyTexture(TextureHandle _handle) override
@@ -3037,16 +3036,36 @@ namespace bgfx { namespace mtl
 						return;
 					}
 
-					CALayer* layer = contentView.layer;
-					if(NULL != layer && [layer isKindOfClass:NSClassFromString(@"CAMetalLayer")])
+					void (^setLayer)(void) = ^{
+						CALayer* layer = contentView.layer;
+						if(NULL != layer && [layer isKindOfClass:NSClassFromString(@"CAMetalLayer")])
+						{
+							m_metalLayer = (CAMetalLayer*)layer;
+						}
+						else
+						{
+							[contentView setWantsLayer:YES];
+							m_metalLayer = [CAMetalLayer layer];
+							[contentView setLayer:m_metalLayer];
+						}
+					};
+					
+					if ([NSThread isMainThread])
 					{
-						m_metalLayer = (CAMetalLayer*)layer;
+						setLayer();
 					}
 					else
 					{
-						[contentView setWantsLayer:YES];
-						m_metalLayer = [CAMetalLayer layer];
-						[contentView setLayer:m_metalLayer];
+						bx::Semaphore semaphore;
+						bx::Semaphore* psemaphore = &semaphore;
+						
+						CFRunLoopPerformBlock([[NSRunLoop mainRunLoop] getCFRunLoop],
+											  kCFRunLoopCommonModes,
+											  ^{
+												  setLayer();
+												  psemaphore->post();
+											  });
+						semaphore.wait();
 					}
 				}
 			}
