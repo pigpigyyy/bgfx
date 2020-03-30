@@ -3,6 +3,7 @@
 // Copyright (C) 2012-2013 LunarG, Inc.
 // Copyright (C) 2017 ARM Limited.
 // Copyright (C) 2015-2018 Google, Inc.
+// Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
 //
 // All rights reserved.
 //
@@ -74,7 +75,8 @@ void TType::buildMangledName(TString& mangledName) const
     case EbtInt64:              mangledName += "i64";    break;
     case EbtUint64:             mangledName += "u64";    break;
     case EbtAtomicUint:         mangledName += "au";     break;
-    case EbtAccStructNV:        mangledName += "asnv";   break;
+    case EbtAccStruct:          mangledName += "as";     break;
+    case EbtRayQuery:           mangledName += "rq";     break;
 #endif
     case EbtSampler:
         switch (sampler.type) {
@@ -114,6 +116,7 @@ void TType::buildMangledName(TString& mangledName) const
         default: break; // some compilers want this
         }
 
+#ifdef ENABLE_HLSL
         if (sampler.hasReturnStruct()) {
             // Name mangle for sampler return struct uses struct table index.
             mangledName += "-tx-struct";
@@ -129,6 +132,7 @@ void TType::buildMangledName(TString& mangledName) const
             case 4: break; // default to prior name mangle behavior
             }
         }
+#endif
 
         if (sampler.isMultiSample())
             mangledName += "M";

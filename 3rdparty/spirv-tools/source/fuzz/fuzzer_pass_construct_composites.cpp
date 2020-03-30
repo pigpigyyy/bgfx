@@ -42,9 +42,9 @@ void FuzzerPassConstructComposites::Apply() {
     }
   }
 
-  MaybeAddTransformationBeforeEachInstruction(
+  ForEachInstructionWithInstructionDescriptor(
       [this, &composite_type_ids](
-          const opt::Function& function, opt::BasicBlock* block,
+          opt::Function* function, opt::BasicBlock* block,
           opt::BasicBlock::iterator inst_it,
           const protobufs::InstructionDescriptor& instruction_descriptor)
           -> void {
@@ -148,7 +148,6 @@ void FuzzerPassConstructComposites::Apply() {
         transformation.Apply(GetIRContext(), GetFactManager());
         *GetTransformations()->add_transformation() =
             transformation.ToMessage();
-        // Indicate that one instruction was added.
       });
 }
 
