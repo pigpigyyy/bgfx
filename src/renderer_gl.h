@@ -339,6 +339,10 @@ typedef uint64_t GLuint64;
 #	define GL_BLUE 0x1905
 #endif // GL_BLUE
 
+#ifndef GL_RGB_INTEGER
+#	define GL_RGB_INTEGER 0x8D98
+#endif // GL_RGB_INTEGER
+
 #ifndef GL_RGBA_INTEGER
 #	define GL_RGBA_INTEGER 0x8D99
 #endif // GL_RGBA_INTEGER
@@ -1094,6 +1098,9 @@ namespace bgfx { namespace gl
 {
 	void dumpExtensions(const char* _extensions);
 
+	void lazyEnableVertexAttribArray(GLuint index);
+	void lazyDisableVertexAttribArray(GLuint index);
+
 	const char* glEnumName(GLenum _enum);
 
 #define _GL_CHECK(_check, _call) \
@@ -1392,7 +1399,7 @@ namespace bgfx { namespace gl
 				{
 					Attrib::Enum attr = Attrib::Enum(m_unboundUsedAttrib[ii]);
 					GLint loc = m_attributes[attr];
-					GL_CHECK(glDisableVertexAttribArray(loc) );
+					GL_CHECK(lazyDisableVertexAttribArray(loc) );
 				}
 			}
 		}
