@@ -635,6 +635,8 @@ namespace bgfx { namespace gl
 			OES_depth24,
 			OES_depth32,
 			OES_depth_texture,
+			OES_EGL_image_external,
+			OES_EGL_image_external_essl3,
 			OES_element_index_uint,
 			OES_fragment_precision_high,
 			OES_get_program_binary,
@@ -846,6 +848,8 @@ namespace bgfx { namespace gl
 		{ "OES_depth24",                              false,                             true  },
 		{ "OES_depth32",                              false,                             true  },
 		{ "OES_depth_texture",                        false,                             true  },
+		{ "OES_EGL_image_external",                   false,                             true  }, // GLES2 extension.
+		{ "OES_EGL_image_external_essl3",             false,                             true  }, // GLES3 extension.
 		{ "OES_element_index_uint",                   false,                             true  },
 		{ "OES_fragment_precision_high",              false,                             true  },
 		{ "OES_get_program_binary",                   false,                             true  },
@@ -924,6 +928,12 @@ namespace bgfx { namespace gl
 		"dFdx",
 		"dFdy",
 		"fwidth",
+		NULL
+	};
+
+	static const char* s_OES_EGL_image_external[] =
+	{
+		"samplerExternalOES",
 		NULL
 	};
 
@@ -2725,7 +2735,7 @@ namespace bgfx { namespace gl
 				}
 
 				m_vaoSupport = !BX_ENABLED(BX_PLATFORM_EMSCRIPTEN)
-					&& (!!(BGFX_CONFIG_RENDERER_OPENGLES >= 30)
+				   && (!!(BGFX_CONFIG_RENDERER_OPENGLES >= 30)
 						|| s_extension[Extension::ARB_vertex_array_object].m_supported
 						|| s_extension[Extension::OES_vertex_array_object].m_supported
 						);
@@ -3432,17 +3442,17 @@ namespace bgfx { namespace gl
 			GL_CHECK(glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE) );
 
 			ProgramGL& program = m_program[_blitter.m_program.idx];
-			GL_CHECK(glUseProgram(program.m_id) );
-			GL_CHECK(glUniform1i(program.m_sampler[0], 0) );
+			setProgram(program.m_id);
+			setUniform1i(program.m_sampler[0].loc, 0);
 
 			float proj[16];
 			bx::mtxOrtho(proj, 0.0f, (float)width, (float)height, 0.0f, 0.0f, 1000.0f, 0.0f, g_caps.homogeneousDepth);
 
-			GL_CHECK(glUniformMatrix4fv(program.m_predefined[0].m_loc
+			setUniformMatrix4fv(program.m_predefined[0].m_loc
 				, 1
 				, GL_FALSE
 				, proj
-				) );
+				);
 
 			GL_CHECK(glActiveTexture(GL_TEXTURE0) );
 			GL_CHECK(glBindTexture(GL_TEXTURE_2D, m_textures[_blitter.m_texture.idx].m_id) );
@@ -3543,19 +3553,19 @@ namespace bgfx { namespace gl
 
 		void setShaderUniform4f(uint8_t /*_flags*/, uint32_t _regIndex, const void* _val, uint32_t _numRegs)
 		{
-			GL_CHECK(glUniform4fv(_regIndex
+			setUniform4fv(_regIndex
 				, _numRegs
 				, (const GLfloat*)_val
-				) );
+				);
 		}
 
 		void setShaderUniform4x4f(uint8_t /*_flags*/, uint32_t _regIndex, const void* _val, uint32_t _numRegs)
 		{
-			GL_CHECK(glUniformMatrix4fv(_regIndex
+			setUniformMatrix4fv(_regIndex
 				, _numRegs
 				, GL_FALSE
 				, (const GLfloat*)_val
-				) );
+				);
 		}
 
 		uint32_t setFrameBuffer(FrameBufferHandle _fbh, uint32_t _height, uint16_t _discard = BGFX_CLEAR_NONE, bool _msaa = true)
@@ -4019,7 +4029,7 @@ namespace bgfx { namespace gl
 		case UniformType::_uniform: \
 				{ \
 					_type* value = (_type*)data; \
-					GL_CHECK(glUniform##_glsuffix(loc, num, value) ); \
+					setUniform##_glsuffix(loc, num, value); \
 				} \
 				break;
 
@@ -4027,7 +4037,7 @@ namespace bgfx { namespace gl
 		case UniformType::_uniform: \
 				{ \
 					_type* value = (_type*)data; \
-					GL_CHECK(glUniform##_glsuffix(loc, num, GL_FALSE, value) ); \
+					setUniform##_glsuffix(loc, num, GL_FALSE, value); \
 				} \
 				break;
 
@@ -4038,12 +4048,12 @@ namespace bgfx { namespace gl
 				// since they need to marshal an array over from Wasm to JS, so optimize the case when there is exactly one
 				// uniform to upload.
 				case UniformType::Sampler:
-					if (num > 1) glUniform1iv(loc, num, (int*)data);
-					else glUniform1i(loc, *(int*)data);
+					if (num > 1) setUniform1iv(loc, num, (int*)data);
+					else setUniform1i(loc, *(int*)data);
 					break;
 				case UniformType::Vec4:
-					if (num > 1) glUniform4fv(loc, num, (float*)data);
-					else glUniform4f(loc, ((float*)data)[0], ((float*)data)[1], ((float*)data)[2], ((float*)data)[3]);
+					if (num > 1) setUniform4fv(loc, num, (float*)data);
+					else setUniform4f(loc, ((float*)data)[0], ((float*)data)[1], ((float*)data)[2], ((float*)data)[3]);
 					break;
 #else
 				CASE_IMPLEMENT_UNIFORM(Sampler, 1iv, I, int);
@@ -4168,7 +4178,7 @@ namespace bgfx { namespace gl
 				GL_CHECK(glBindBuffer(GL_ARRAY_BUFFER, vb.m_id) );
 
 				ProgramGL& program = m_program[_clearQuad.m_program[numMrt-1].idx];
-				GL_CHECK(glUseProgram(program.m_id) );
+				setProgram(program.m_id);
 				program.bindAttributesBegin();
 				program.bindAttributes(layout, 0);
 				program.bindAttributesEnd();
@@ -4227,6 +4237,95 @@ namespace bgfx { namespace gl
 			}
 		}
 
+		void setProgram(GLuint program)
+		{
+			m_uniformStateCache.saveCurrentProgram(program);
+			GL_CHECK(glUseProgram(program) );
+		}
+
+		// Cache uniform uploads to avoid redundant uploading of state that is
+		// already set to a shader program
+		void setUniform1i(uint32_t loc, int value)
+		{
+			if (m_uniformStateCache.updateUniformCache(loc, value))
+			{
+				GL_CHECK(glUniform1i(loc, value) );
+			}
+		}
+
+		void setUniform1iv(uint32_t loc, int num, const int *data)
+		{
+			bool changed = false;
+			for(int i = 0; i < num; ++i)
+			{
+				if (m_uniformStateCache.updateUniformCache(loc+i, data[i]))
+				{
+					changed = true;
+				}
+			}
+			if (changed)
+			{
+				GL_CHECK(glUniform1iv(loc, num, data) );
+			}
+		}
+
+		void setUniform4f(uint32_t loc, float x, float y, float z, float w)
+		{
+			UniformStateCache::f4 f; f.val[0] = x; f.val[1] = y; f.val[2] = z; f.val[3] = w;
+			if (m_uniformStateCache.updateUniformCache(loc, f))
+			{
+				GL_CHECK(glUniform4f(loc, x, y, z, w));
+			}
+		}
+
+		void setUniform4fv(uint32_t loc, int num, const float *data)
+		{
+			bool changed = false;
+			for(int i = 0; i < num; ++i)
+			{
+				if (m_uniformStateCache.updateUniformCache(loc+i, *(const UniformStateCache::f4*)&data[4*i]))
+				{
+					changed = true;
+				}
+			}
+			if (changed)
+			{
+				GL_CHECK(glUniform4fv(loc, num, data) );
+			}
+		}
+
+		void setUniformMatrix3fv(uint32_t loc, int num, GLboolean transpose, const float *data)
+		{
+			bool changed = false;
+			for(int i = 0; i < num; ++i)
+			{
+				if (m_uniformStateCache.updateUniformCache(loc+i, *(const UniformStateCache::f3x3*)&data[9*i]))
+				{
+					changed = true;
+				}
+			}
+			if (changed)
+			{
+				GL_CHECK(glUniformMatrix3fv(loc, num, transpose, data) );
+			}
+		}
+
+		void setUniformMatrix4fv(uint32_t loc, int num, GLboolean transpose, const float *data)
+		{
+			bool changed = false;
+			for(int i = 0; i < num; ++i)
+			{
+				if (m_uniformStateCache.updateUniformCache(loc+i, *(const UniformStateCache::f4x4*)&data[16*i]))
+				{
+					changed = true;
+				}
+			}
+			if (changed)
+			{
+				GL_CHECK(glUniformMatrix4fv(loc, num, transpose, data) );
+			}
+		}
+
 		void* m_renderdocdll;
 
 		uint16_t m_numWindows;
@@ -4246,6 +4345,7 @@ namespace bgfx { namespace gl
 		OcclusionQueryGL m_occlusionQuery;
 
 		SamplerStateCache m_samplerStateCache;
+		UniformStateCache m_uniformStateCache;
 
 		TextVideoMem m_textVideoMem;
 		bool m_rtMsaa;
@@ -4393,6 +4493,8 @@ namespace bgfx { namespace gl
 			GLSL_TYPE(GL_IMAGE_CUBE);
 			GLSL_TYPE(GL_INT_IMAGE_CUBE);
 			GLSL_TYPE(GL_UNSIGNED_INT_IMAGE_CUBE);
+			GLSL_TYPE(GL_SAMPLER_EXTERNAL_OES);
+
 		}
 
 #undef GLSL_TYPE
@@ -4491,11 +4593,95 @@ namespace bgfx { namespace gl
 		case GL_IMAGE_CUBE:
 		case GL_INT_IMAGE_CUBE:
 		case GL_UNSIGNED_INT_IMAGE_CUBE:
+
+		case GL_SAMPLER_EXTERNAL_OES:
 			return UniformType::Sampler;
 		};
 
 		BX_CHECK(false, "Unrecognized GL type 0x%04x.", _type);
 		return UniformType::End;
+	}
+
+	GLenum glSamplerTarget(GLenum _sampler){
+		switch (_sampler)
+		{
+			case GL_SAMPLER_1D:
+			case GL_INT_SAMPLER_1D:
+			case GL_UNSIGNED_INT_SAMPLER_1D:
+			case GL_SAMPLER_1D_SHADOW:
+				return GL_TEXTURE_1D;
+
+			case GL_SAMPLER_1D_ARRAY:
+			case GL_INT_SAMPLER_1D_ARRAY:
+			case GL_UNSIGNED_INT_SAMPLER_1D_ARRAY:
+			case GL_SAMPLER_1D_ARRAY_SHADOW:
+				return GL_TEXTURE_1D_ARRAY;
+
+			case GL_SAMPLER_2D:
+			case GL_INT_SAMPLER_2D:
+			case GL_UNSIGNED_INT_SAMPLER_2D:
+			case GL_SAMPLER_2D_SHADOW:
+				return GL_TEXTURE_2D;
+
+			case GL_SAMPLER_2D_ARRAY:
+			case GL_INT_SAMPLER_2D_ARRAY:
+			case GL_UNSIGNED_INT_SAMPLER_2D_ARRAY:
+			case GL_SAMPLER_2D_ARRAY_SHADOW:
+				return GL_TEXTURE_2D_ARRAY;
+
+			case GL_SAMPLER_2D_MULTISAMPLE:
+				return GL_TEXTURE_2D_MULTISAMPLE;
+
+			case GL_SAMPLER_2D_MULTISAMPLE_ARRAY:
+				return GL_TEXTURE_2D_MULTISAMPLE_ARRAY;
+
+			case GL_SAMPLER_CUBE:
+			case GL_SAMPLER_CUBE_SHADOW:
+			case GL_INT_SAMPLER_CUBE:
+			case GL_UNSIGNED_INT_SAMPLER_CUBE:
+				return GL_TEXTURE_CUBE_MAP;
+
+			case GL_SAMPLER_CUBE_MAP_ARRAY:
+			case GL_SAMPLER_CUBE_MAP_ARRAY_SHADOW:
+			case GL_INT_SAMPLER_CUBE_MAP_ARRAY:
+			case GL_UNSIGNED_INT_SAMPLER_CUBE_MAP_ARRAY:
+				return GL_TEXTURE_CUBE_MAP_ARRAY;
+
+			case GL_SAMPLER_3D:
+			case GL_INT_SAMPLER_3D:
+			case GL_UNSIGNED_INT_SAMPLER_3D:
+				return GL_TEXTURE_3D;
+
+			case GL_SAMPLER_EXTERNAL_OES:
+				return GL_TEXTURE_EXTERNAL_OES;
+
+			case GL_SAMPLER_2D_RECT:
+			case GL_INT_SAMPLER_2D_RECT:
+			case GL_UNSIGNED_INT_SAMPLER_2D_RECT:
+			case GL_SAMPLER_2D_RECT_SHADOW:
+				return GL_TEXTURE_RECTANGLE;
+
+			case GL_IMAGE_1D:
+
+			case GL_INT_IMAGE_1D:
+			case GL_UNSIGNED_INT_IMAGE_1D:
+
+			case GL_IMAGE_2D:
+			case GL_INT_IMAGE_2D:
+			case GL_UNSIGNED_INT_IMAGE_2D:
+
+			case GL_IMAGE_3D:
+			case GL_INT_IMAGE_3D:
+			case GL_UNSIGNED_INT_IMAGE_3D:
+
+			case GL_IMAGE_CUBE:
+			case GL_INT_IMAGE_CUBE:
+			case GL_UNSIGNED_INT_IMAGE_CUBE:
+				return 0;
+		}
+
+		BX_CHECK(false, "Unrecognized GL sampler type 0x%04x.", _sampler);
+		return 0;
 	}
 
 	void ProgramGL::create(const ShaderGL& _vsh, const ShaderGL& _fsh)
@@ -4568,7 +4754,7 @@ namespace bgfx { namespace gl
 
 		if (0 != m_id)
 		{
-			GL_CHECK(glUseProgram(0) );
+			s_renderGL->setProgram(0);
 			GL_CHECK(glDeleteProgram(m_id) );
 			m_id = 0;
 		}
@@ -4646,6 +4832,7 @@ namespace bgfx { namespace gl
 
 		m_numPredefined = 0;
 		m_numSamplers = 0;
+		bx::memSet(m_sampler, 0, sizeof(m_sampler) );
 
 		BX_TRACE("Uniforms (%d):", activeUniforms);
 		for (int32_t ii = 0; ii < activeUniforms; ++ii)
@@ -4745,10 +4932,12 @@ namespace bgfx { namespace gl
 			case GL_IMAGE_CUBE:
 			case GL_INT_IMAGE_CUBE:
 			case GL_UNSIGNED_INT_IMAGE_CUBE:
+
+			case GL_SAMPLER_EXTERNAL_OES:
 				if (m_numSamplers < BX_COUNTOF(m_sampler) )
 				{
 					BX_TRACE("Sampler #%d at location %d.", m_numSamplers, loc);
-					m_sampler[m_numSamplers] = loc;
+					m_sampler[m_numSamplers] = {loc, glSamplerTarget(gltype)};
 					m_numSamplers++;
 				}
 				else
@@ -5595,16 +5784,17 @@ namespace bgfx { namespace gl
 		}
 	}
 
-	void TextureGL::commit(uint32_t _stage, uint32_t _flags, const float _palette[][4])
+	void TextureGL::commit(uint32_t _stage, uint32_t _flags, const float _palette[][4], GLenum _target)
 	{
 		const uint32_t flags = 0 == (BGFX_SAMPLER_INTERNAL_DEFAULT & _flags)
 			? _flags
 			: uint32_t(m_flags)
 			;
 		const uint32_t index = (flags & BGFX_SAMPLER_BORDER_COLOR_MASK) >> BGFX_SAMPLER_BORDER_COLOR_SHIFT;
+		const GLenum target = 0 == _target ? m_target : _target;
 
 		GL_CHECK(glActiveTexture(GL_TEXTURE0+_stage) );
-		GL_CHECK(glBindTexture(m_target, m_id) );
+		GL_CHECK(glBindTexture(target, m_id) );
 
 		if (BX_ENABLED(BGFX_CONFIG_RENDERER_OPENGLES)
 		&&  BX_ENABLED(BGFX_CONFIG_RENDERER_OPENGLES < 30) )
@@ -5750,6 +5940,10 @@ namespace bgfx { namespace gl
 						&& !bx::findIdentifierMatch(code, s_OES_standard_derivatives).isEmpty()
 						;
 
+					const bool  usesSamplerExternal = s_extension[Extension::OES_EGL_image_external].m_supported
+						&& !bx::findIdentifierMatch(code, s_OES_EGL_image_external).isEmpty()
+						;
+
 					const bool usesFragData         = !bx::findIdentifierMatch(code, "gl_FragData").isEmpty();
 					const bool usesFragDepth        = !bx::findIdentifierMatch(code, "gl_FragDepth").isEmpty();
 					const bool usesShadowSamplers   = !bx::findIdentifierMatch(code, s_EXT_shadow_samplers).isEmpty();
@@ -5764,6 +5958,11 @@ namespace bgfx { namespace gl
 					if (usesDerivatives)
 					{
 						bx::write(&writer, "#extension GL_OES_standard_derivatives : enable\n");
+					}
+
+					if (usesSamplerExternal)
+					{
+						bx::write(&writer, "#extension GL_OES_EGL_image_external : enable\n");
 					}
 
 					if (usesFragData)
@@ -6118,11 +6317,7 @@ namespace bgfx { namespace gl
 				{
 					if (BX_ENABLED(BGFX_CONFIG_RENDERER_OPENGLES >= 30) )
 					{
-						bx::write(&writer, &err
-							, "#version 300 es\n"
-							  "precision %s float;\n"
-							, m_type == GL_FRAGMENT_SHADER ? "mediump" : "highp"
-							);
+						bx::write(&writer, "#version 300 es\n");
 					}
 					else
 					{
@@ -6189,6 +6384,23 @@ namespace bgfx { namespace gl
 						if (!bx::findIdentifierMatch(code, s_ARB_texture_multisample).isEmpty() )
 						{
 							bx::write(&writer, "#extension GL_ARB_texture_multisample : enable\n");
+						}
+
+						const bool  usesSamplerExternal = s_extension[Extension::OES_EGL_image_external_essl3].m_supported
+							&& !bx::findIdentifierMatch(code, s_OES_EGL_image_external).isEmpty()
+							;
+
+						if(usesSamplerExternal)
+						{
+							bx::write(&writer, "#extension GL_OES_EGL_image_external_essl3 : enable\n");
+						}
+
+						if (BX_ENABLED(BGFX_CONFIG_RENDERER_OPENGLES >= 30) )
+						{
+							bx::write(&writer, &err
+								, "precision %s float;\n"
+								, m_type == GL_FRAGMENT_SHADER ? "mediump" : "highp"
+								);
 						}
 
 						if (0 != fragData)
@@ -7033,7 +7245,7 @@ namespace bgfx { namespace gl
 						const RenderCompute& compute = renderItem.compute;
 
 						ProgramGL& program = m_program[key.m_program.idx];
-						GL_CHECK(glUseProgram(program.m_id) );
+						setProgram(program.m_id);
 
 						GLbitfield barrier = 0;
 						for (uint32_t ii = 0; ii < maxComputeBindings; ++ii)
@@ -7046,7 +7258,7 @@ namespace bgfx { namespace gl
 								case Binding::Texture:
 									{
 										TextureGL& texture = m_textures[bind.m_idx];
-										texture.commit(ii, bind.m_samplerFlags, _render->m_colorPalette);
+										texture.commit(ii, bind.m_samplerFlags, _render->m_colorPalette, program.m_sampler[ii].target);
 									}
 									break;
 
@@ -7552,7 +7764,7 @@ namespace bgfx { namespace gl
 					// Skip rendering if program index is valid, but program is invalid.
 					currentProgram = 0 == id ? ProgramHandle{kInvalidHandle} : currentProgram;
 
-					GL_CHECK(glUseProgram(id) );
+					setProgram(id);
 					programChanged =
 						constantsChanged =
 						bindAttribs = true;
@@ -7587,7 +7799,7 @@ namespace bgfx { namespace gl
 									case Binding::Texture:
 										{
 											TextureGL& texture = m_textures[bind.m_idx];
-											texture.commit(stage, bind.m_samplerFlags, _render->m_colorPalette);
+											texture.commit(stage, bind.m_samplerFlags, _render->m_colorPalette, program.m_sampler[stage].target);
 										}
 										break;
 
