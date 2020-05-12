@@ -1,7 +1,7 @@
 -- vim: syntax=lua
 -- bgfx interface
 
-version(105)
+version(106)
 
 typedef "bool"
 typedef "char"
@@ -458,6 +458,7 @@ enum.RendererType { comment = "Renderer types:" }
 	.OpenGLES   --- OpenGL ES 2.0+
 	.OpenGL     --- OpenGL 2.1+
 	.Vulkan     --- Vulkan
+	.WebGPU     --- WebGPU
 	()
 
 --- Access mode enum.
@@ -676,7 +677,7 @@ struct.GPU  { namespace = "Caps" }
 	.vendorId    "uint16_t"                --- Vendor PCI id. See `BGFX_PCI_ID_*`.
 	.deviceId    "uint16_t"                --- Device id.
 
---- Renderer capabilities limits.
+--- Renderer runtime limits.
 struct.Limits  { namespace = "Caps" }
 	.maxDrawCalls            "uint32_t"    --- Maximum number of draw calls.
 	.maxBlits                "uint32_t"    --- Maximum number of blit calls.
@@ -713,7 +714,7 @@ struct.Caps
 	.originBottomLeft "bool"           --- True when NDC origin is at bottom left.
 	.numGPUs      "uint8_t"            --- Number of enumerated GPUs.
 	.gpu          "GPU[4]"             --- Enumerated GPUs.
-	.limits       "Limits"
+	.limits       "Limits"             --- Renderer runtime limits.
 	.formats      "uint16_t[TextureFormat::Count]"
 		--- Supported texture format capabilities flags:
 		---   - `BGFX_CAPS_FORMAT_TEXTURE_NONE` - Texture format is not supported.
@@ -762,6 +763,7 @@ struct.Resolution { ctor }
 	.numBackBuffers  "uint8_t"             --- Number of back buffers.
 	.maxFrameLatency "uint8_t"             --- Maximum frame latency.
 
+--- Configurable runtime limits parameters.
 struct.Limits { namespace = "Init" }
 	.maxEncoders    "uint16_t"             --- Maximum number of encoder threads.
 	.transientVbSize "uint32_t"            --- Maximum transient vertex buffer size.
@@ -788,7 +790,7 @@ struct.Init { ctor }
 	.profile        "bool"                 --- Enable device for profiling.
 	.platformData   "PlatformData"         --- Platform data.
 	.resolution     "Resolution"           --- Backbuffer resolution and reset parameters. See: `bgfx::Resolution`.
-	.limits         "Limits"
+	.limits         "Limits"               --- Configurable runtime limits parameters.
 	.callback       "CallbackI*"           --- Provide application specific callback interface.
 	                                       --- See: `bgfx::CallbackI`
 
@@ -2074,6 +2076,11 @@ func.setViewOrder
 	.order "const ViewId*" --- View remap id table. Passing `NULL` will reset view ids
 	                       --- to default state.
 	 { default = NULL }
+
+--- Reset all view settings to default.
+func.resetView
+	"void"
+	.id "ViewId" -- _id View id.
 
 --- Begin submitting draw calls from thread.
 func.begin { cname = "encoder_begin" }

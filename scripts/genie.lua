@@ -48,6 +48,11 @@ newoption {
 	description = "Enable building examples.",
 }
 
+newoption {
+	trigger = "with-webgpu",
+	description = "Enable webgpu experimental renderer.",
+}
+
 newaction {
 	trigger = "idl",
 	description = "Generate bgfx interface source code",
@@ -117,7 +122,7 @@ solution "bgfx"
 		"Release",
 	}
 
-	if _ACTION:match "xcode*" then
+	if _ACTION ~= nil and _ACTION:match "xcode*" then
 		platforms {
 			"Universal",
 		}
@@ -151,15 +156,32 @@ end
 if not os.isdir(BX_DIR) or not os.isdir(BIMG_DIR) then
 
 	if not os.isdir(BX_DIR) then
-		print("bx not found at " .. BX_DIR)
+		print("bx not found at \"" .. BX_DIR .. "\". git clone https://github.com/bkaradzic/bx?")
 	end
 
 	if not os.isdir(BIMG_DIR) then
-		print("bimg not found at " .. BIMG_DIR)
+		print("bimg not found at \"" .. BIMG_DIR .. "\". git clone https://github.com/bkaradzic/bimg?")
 	end
 
 	print("For more info see: https://bkaradzic.github.io/bgfx/build.html")
 	os.exit()
+end
+
+if _OPTIONS["with-webgpu"] then
+	DAWN_DIR = os.getenv("DAWN_DIR")
+
+	if not DAWN_DIR then
+		DAWN_DIR = path.getabsolute(path.join(BGFX_DIR, "../dawn"))
+	end
+
+	if not os.isdir(DAWN_DIR) then
+		print("Dawn not found at \"" .. DAWN_DIR .. "\". git clone https://dawn.googlesource.com/dawn?")
+
+		print("For more info see: https://bkaradzic.github.io/bgfx/build.html")
+		os.exit()
+	end
+
+	_OPTIONS["with-windows"] = "10.0"
 end
 
 dofile (path.join(BX_DIR, "scripts/toolchain.lua"))
@@ -213,6 +235,10 @@ function exampleProjectDefaults()
 		"bimg",
 		"bx",
 	}
+
+	if _OPTIONS["with-webgpu"] then
+		usesWebGPU()
+	end
 
 	if _OPTIONS["with-sdl"] then
 		defines { "ENTRY_CONFIG_USE_SDL=1" }

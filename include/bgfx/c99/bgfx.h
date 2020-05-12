@@ -90,6 +90,7 @@ typedef enum bgfx_renderer_type
     BGFX_RENDERER_TYPE_OPENGLES,              /** ( 7) OpenGL ES 2.0+                 */
     BGFX_RENDERER_TYPE_OPENGL,                /** ( 8) OpenGL 2.1+                    */
     BGFX_RENDERER_TYPE_VULKAN,                /** ( 9) Vulkan                         */
+    BGFX_RENDERER_TYPE_WEBGPU,                /** (10) WebGPU                         */
 
     BGFX_RENDERER_TYPE_COUNT
 
@@ -487,7 +488,7 @@ typedef struct bgfx_caps_gpu_s
 } bgfx_caps_gpu_t;
 
 /**
- * Renderer capabilities limits.
+ * Renderer runtime limits.
  *
  */
 typedef struct bgfx_caps_limits_s
@@ -537,7 +538,7 @@ typedef struct bgfx_caps_s
     bool                 originBottomLeft;   /** True when NDC origin is at bottom left.  */
     uint8_t              numGPUs;            /** Number of enumerated GPUs.               */
     bgfx_caps_gpu_t      gpu[4];             /** Enumerated GPUs.                         */
-    bgfx_caps_limits_t   limits;
+    bgfx_caps_limits_t   limits;             /** Renderer runtime limits.                 */
     
     /**
      * Supported texture format capabilities flags:
@@ -621,6 +622,10 @@ typedef struct bgfx_resolution_s
 
 } bgfx_resolution_t;
 
+/**
+ * Configurable runtime limits parameters.
+ *
+ */
 typedef struct bgfx_init_limits_s
 {
     uint16_t             maxEncoders;        /** Maximum number of encoder threads.       */
@@ -663,7 +668,7 @@ typedef struct bgfx_init_s
     bool                 profile;            /** Enable device for profiling.             */
     bgfx_platform_data_t platformData;       /** Platform data.                           */
     bgfx_resolution_t    resolution;         /** Backbuffer resolution and reset parameters. See: `bgfx::Resolution`. */
-    bgfx_init_limits_t   limits;
+    bgfx_init_limits_t   limits;             /** Configurable runtime limits parameters.  */
     
     /**
      * Provide application specific callback interface.
@@ -2273,6 +2278,14 @@ BGFX_C_API void bgfx_set_view_transform(bgfx_view_id_t _id, const void* _view, c
 BGFX_C_API void bgfx_set_view_order(bgfx_view_id_t _id, uint16_t _num, const bgfx_view_id_t* _order);
 
 /**
+ * Reset all view settings to default.
+ *
+ * @param[in] _id
+ *
+ */
+BGFX_C_API void bgfx_reset_view(bgfx_view_id_t _id);
+
+/**
  * Begin submitting draw calls from thread.
  *
  * @param[in] _forThread Explicitly request an encoder for a worker thread.
@@ -3357,6 +3370,7 @@ typedef enum bgfx_function_id
     BGFX_FUNCTION_ID_SET_VIEW_FRAME_BUFFER,
     BGFX_FUNCTION_ID_SET_VIEW_TRANSFORM,
     BGFX_FUNCTION_ID_SET_VIEW_ORDER,
+    BGFX_FUNCTION_ID_RESET_VIEW,
     BGFX_FUNCTION_ID_ENCODER_BEGIN,
     BGFX_FUNCTION_ID_ENCODER_END,
     BGFX_FUNCTION_ID_ENCODER_SET_MARKER,
@@ -3549,6 +3563,7 @@ struct bgfx_interface_vtbl
     void (*set_view_frame_buffer)(bgfx_view_id_t _id, bgfx_frame_buffer_handle_t _handle);
     void (*set_view_transform)(bgfx_view_id_t _id, const void* _view, const void* _proj);
     void (*set_view_order)(bgfx_view_id_t _id, uint16_t _num, const bgfx_view_id_t* _order);
+    void (*reset_view)(bgfx_view_id_t _id);
     bgfx_encoder_t* (*encoder_begin)(bool _forThread);
     void (*encoder_end)(bgfx_encoder_t* _encoder);
     void (*encoder_set_marker)(bgfx_encoder_t* _this, const char* _marker);
