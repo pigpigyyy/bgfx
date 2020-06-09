@@ -49,7 +49,6 @@ if(SPIRV_BUILD_FUZZER)
         fuzzer_pass_add_local_variables.h
         fuzzer_pass_add_no_contraction_decorations.h
         fuzzer_pass_add_stores.h
-        fuzzer_pass_add_useful_constructs.h
         fuzzer_pass_adjust_branch_weights.h
         fuzzer_pass_adjust_function_controls.h
         fuzzer_pass_adjust_loop_controls.h
@@ -64,6 +63,7 @@ if(SPIRV_BUILD_FUZZER)
         fuzzer_pass_outline_functions.h
         fuzzer_pass_permute_blocks.h
         fuzzer_pass_permute_function_parameters.h
+        fuzzer_pass_push_ids_through_variables.h
         fuzzer_pass_split_blocks.h
         fuzzer_pass_swap_commutable_operands.h
         fuzzer_pass_toggle_access_chain_instruction.h
@@ -112,6 +112,7 @@ if(SPIRV_BUILD_FUZZER)
         transformation_move_block_down.h
         transformation_outline_function.h
         transformation_permute_function_parameters.h
+        transformation_push_id_through_variable.h
         transformation_replace_boolean_constant_with_constant_binary.h
         transformation_replace_constant_with_uniform.h
         transformation_replace_id_with_synonym.h
@@ -146,7 +147,6 @@ if(SPIRV_BUILD_FUZZER)
         fuzzer_pass_add_local_variables.cpp
         fuzzer_pass_add_no_contraction_decorations.cpp
         fuzzer_pass_add_stores.cpp
-        fuzzer_pass_add_useful_constructs.cpp
         fuzzer_pass_adjust_branch_weights.cpp
         fuzzer_pass_adjust_function_controls.cpp
         fuzzer_pass_adjust_loop_controls.cpp
@@ -161,6 +161,7 @@ if(SPIRV_BUILD_FUZZER)
         fuzzer_pass_outline_functions.cpp
         fuzzer_pass_permute_blocks.cpp
         fuzzer_pass_permute_function_parameters.cpp
+        fuzzer_pass_push_ids_through_variables.cpp
         fuzzer_pass_split_blocks.cpp
         fuzzer_pass_swap_commutable_operands.cpp
         fuzzer_pass_toggle_access_chain_instruction.cpp
@@ -208,6 +209,7 @@ if(SPIRV_BUILD_FUZZER)
         transformation_move_block_down.cpp
         transformation_outline_function.cpp
         transformation_permute_function_parameters.cpp
+        transformation_push_id_through_variable.cpp
         transformation_replace_boolean_constant_with_constant_binary.cpp
         transformation_replace_constant_with_uniform.cpp
         transformation_replace_id_with_synonym.cpp
