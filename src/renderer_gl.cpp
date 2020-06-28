@@ -9,10 +9,7 @@
 #	include "renderer_gl.h"
 #	include <bx/timer.h>
 #	include <bx/uint32_t.h>
-
-#if BX_PLATFORM_EMSCRIPTEN
-#	include <emscripten/html5.h>
-#endif
+#	include "emscripten.h"
 
 namespace bgfx { namespace gl
 {
@@ -1590,17 +1587,19 @@ namespace bgfx { namespace gl
 #if BX_PLATFORM_EMSCRIPTEN
 	static bool isTextureFormatValidPerSpec(
 		  TextureFormat::Enum _format
-		, bool _srgb = false
-		, bool _mipAutogen = false
-		, bool _array = false
-		, GLsizei _dim = 16
+		, bool _srgb
+		, bool _mipAutogen
 		)
 	{
-		// Avoid creating test textures for WebGL, that causes error noise in the browser console; instead examine the supported texture formats from the spec.
+		// Avoid creating test textures for WebGL, that causes error noise in the browser
+		// console; instead examine the supported texture formats from the spec.
 		EMSCRIPTEN_WEBGL_CONTEXT_HANDLE ctx = emscripten_webgl_get_current_context();
+
 		EmscriptenWebGLContextAttributes attrs;
-		BX_CHECK(emscripten_webgl_get_context_attributes(ctx, &attrs) == EMSCRIPTEN_RESULT_SUCCESS, "emscripten_webgl_get_context_attributes() failed in isTextureFormatValidPerSpec()!");
-		int glesVersion = attrs.majorVersion + 1;
+		EMSCRIPTEN_CHECK(emscripten_webgl_get_context_attributes(ctx, &attrs) );
+
+		const int glesVersion = attrs.majorVersion + 1;
+
 		switch(_format)
 		{
 			case TextureFormat::A8:
@@ -1608,9 +1607,15 @@ namespace bgfx { namespace gl
 			case TextureFormat::R5G6B5:
 			case TextureFormat::RGBA4:
 			case TextureFormat::RGB5A1:
-				return !_srgb; // GLES2 formats without sRGB.
+				// GLES2 formats without sRGB.
+				return !_srgb;
+
 			case TextureFormat::D16:
-				return !_srgb && !_mipAutogen; // GLES2 formats without sRGB, depth textures do not support mipmaps.
+				// GLES2 formats without sRGB, depth textures do not support mipmaps.
+				return !_srgb
+					&& !_mipAutogen
+					;
+
 			case TextureFormat::R16F:
 			case TextureFormat::R32F:
 			case TextureFormat::RG8:
@@ -1618,7 +1623,11 @@ namespace bgfx { namespace gl
 			case TextureFormat::RG32F:
 			case TextureFormat::RGB10A2:
 			case TextureFormat::RG11B10F:
-				return !_srgb && glesVersion >= 3; // GLES3 formats without sRGB
+				// GLES3 formats without sRGB
+				return !_srgb
+					&& glesVersion >= 3
+					;
+
 			case TextureFormat::R8I:
 			case TextureFormat::R8U:
 			case TextureFormat::R16I:
@@ -1645,36 +1654,67 @@ namespace bgfx { namespace gl
 			case TextureFormat::RGB8S:
 			case TextureFormat::RGBA8S:
 			case TextureFormat::RGB9E5F:
-				return !_srgb && glesVersion >= 3 && !_mipAutogen; // GLES3 formats without sRGB that are not texture filterable or color renderable.
+				// GLES3 formats without sRGB that are not texture filterable or color renderable.
+				return !_srgb && glesVersion >= 3
+					&& !_mipAutogen
+					;
+
 			case TextureFormat::D24:
 			case TextureFormat::D24S8:
 			case TextureFormat::D32:
-				return !_srgb && !_mipAutogen && (glesVersion >= 3 || emscripten_webgl_enable_extension(ctx, "WEBGL_depth_texture")); // GLES3 formats without sRGB, depth textures do not support mipmaps.
+				// GLES3 formats without sRGB, depth textures do not support mipmaps.
+				return !_srgb && !_mipAutogen
+					&& (glesVersion >= 3 || emscripten_webgl_enable_extension(ctx, "WEBGL_depth_texture") )
+					;
+
 			case TextureFormat::D16F:
 			case TextureFormat::D24F:
-				return !_srgb && !_mipAutogen && glesVersion >= 3; // GLES3 depth formats without sRGB, depth textures do not support mipmaps.
+				// GLES3 depth formats without sRGB, depth textures do not support mipmaps.
+				return !_srgb
+					&& !_mipAutogen
+					&& glesVersion >= 3
+					;
+
 			case TextureFormat::RGBA16F:
 			case TextureFormat::RGBA32F:
-				return !_srgb && (glesVersion >= 3 || emscripten_webgl_enable_extension(ctx, "OES_texture_half_float")); // GLES3 formats without sRGB
+				// GLES3 formats without sRGB
+				return !_srgb
+					&& (glesVersion >= 3 || emscripten_webgl_enable_extension(ctx, "OES_texture_half_float") )
+					;
+
 			case TextureFormat::RGB8:
 			case TextureFormat::RGBA8:
-				return !_srgb || glesVersion >= 3 || emscripten_webgl_enable_extension(ctx, "EXT_sRGB"); // sRGB formats
+				// sRGB formats
+				return !_srgb
+					|| glesVersion >= 3
+					|| emscripten_webgl_enable_extension(ctx, "EXT_sRGB")
+					;
+
 			case TextureFormat::BC1:
 			case TextureFormat::BC2:
 			case TextureFormat::BC3:
-				return emscripten_webgl_enable_extension(ctx, "WEBGL_compressed_texture_s3tc")
-					&& (!_srgb || emscripten_webgl_enable_extension(ctx, "WEBGL_compressed_texture_s3tc_srgb"));
+				return            emscripten_webgl_enable_extension(ctx, "WEBGL_compressed_texture_s3tc")
+					&& (!_srgb || emscripten_webgl_enable_extension(ctx, "WEBGL_compressed_texture_s3tc_srgb") )
+					;
+
 			case TextureFormat::PTC12:
 			case TextureFormat::PTC14:
 			case TextureFormat::PTC12A:
 			case TextureFormat::PTC14A:
-				return !_srgb && emscripten_webgl_enable_extension(ctx, "WEBGL_compressed_texture_pvrtc");
+				return !_srgb
+					&& emscripten_webgl_enable_extension(ctx, "WEBGL_compressed_texture_pvrtc")
+					;
+
 			case TextureFormat::ETC1:
-				return !_srgb && emscripten_webgl_enable_extension(ctx, "WEBGL_compressed_texture_etc1");
+				return !_srgb
+					&& emscripten_webgl_enable_extension(ctx, "WEBGL_compressed_texture_etc1")
+					;
+
 			case TextureFormat::ETC2:
 			case TextureFormat::ETC2A:
 			case TextureFormat::ETC2A1:
 				return emscripten_webgl_enable_extension(ctx, "WEBGL_compressed_texture_etc");
+
 			case TextureFormat::ASTC4x4:
 			case TextureFormat::ASTC5x5:
 			case TextureFormat::ASTC6x6:
@@ -1682,11 +1722,14 @@ namespace bgfx { namespace gl
 			case TextureFormat::ASTC8x6:
 			case TextureFormat::ASTC10x5:
 				return emscripten_webgl_enable_extension(ctx, "WEBGL_compressed_texture_astc");
+
 			default:
-				return false;
+				break;
 		}
+
+		return false;
 	}
-#endif
+#endif // BX_PLATFORM_EMSCRIPTEN
 
 	static bool isTextureFormatValid(
 		  TextureFormat::Enum _format
@@ -1699,7 +1742,8 @@ namespace bgfx { namespace gl
 #if BX_PLATFORM_EMSCRIPTEN
 		// On web platform read the validity of textures based on the available GL context and extensions
 		// to avoid developer unfriendly console error noise that would come from probing.
-		return isTextureFormatValidPerSpec(_format, _srgb, _mipAutogen, _array, _dim);
+		BX_UNUSED(_array, _dim);
+		return isTextureFormatValidPerSpec(_format, _srgb, _mipAutogen);
 #else
 		// On other platforms probe the supported textures.
 		const TextureFormatInfo& tfi = s_textureFormat[_format];
@@ -1725,7 +1769,7 @@ namespace bgfx { namespace gl
 		if (_array)
 		{
 			glTexStorage3D(target
-				, 1 + GLsizei(bx::log2((int32_t)_dim) )
+				, 1 + GLsizei(bx::log2( (int32_t)_dim) )
 				, internalFmt
 				, _dim
 				, _dim
@@ -1797,16 +1841,18 @@ namespace bgfx { namespace gl
 #if BX_PLATFORM_EMSCRIPTEN
 	static bool isFramebufferFormatValidPerSpec(
 		  TextureFormat::Enum _format
-		, bool _srgb = false
-		, bool _writeOnly = false
-		, GLsizei _dim = 16
+		, bool _srgb
+		, bool _writeOnly
 		)
 	{
 		// Avoid creating test textures for WebGL, that causes error noise in the browser console; instead examine the supported texture formats from the spec.
 		EMSCRIPTEN_WEBGL_CONTEXT_HANDLE ctx = emscripten_webgl_get_current_context();
+
 		EmscriptenWebGLContextAttributes attrs;
-		emscripten_webgl_get_context_attributes(ctx, &attrs);
-		int glesVersion = attrs.majorVersion + 1;
+		EMSCRIPTEN_CHECK(emscripten_webgl_get_context_attributes(ctx, &attrs) );
+
+		const int glesVersion = attrs.majorVersion + 1;
+
 		switch(_format)
 		{
 			// GLES2 textures
@@ -1815,13 +1861,20 @@ namespace bgfx { namespace gl
 			case TextureFormat::RGB5A1:
 			case TextureFormat::D16:
 				return !_srgb;
+
 			// GLES2 renderbuffers not a texture in GLES3
 			case TextureFormat::D0S8:
-				return !_srgb && _writeOnly;
+				return !_srgb
+					&& _writeOnly
+					;
+
 			// GLES2 textures that are not renderbuffers
 			case TextureFormat::RGB8:
 			case TextureFormat::RGBA8:
-				return !_srgb && (!_writeOnly || glesVersion >= 3);
+				return !_srgb
+					&& (!_writeOnly || glesVersion >= 3)
+					;
+
 			// GLES3 EXT_color_buffer_float renderbuffer formats
 			case TextureFormat::R16F:
 			case TextureFormat::RG16F:
@@ -1829,22 +1882,45 @@ namespace bgfx { namespace gl
 			case TextureFormat::RG32F:
 			case TextureFormat::RG11B10F:
 				if (_writeOnly)
+				{
 					return emscripten_webgl_enable_extension(ctx, "EXT_color_buffer_float");
-				else
-					return !_srgb && glesVersion >= 3;
+				}
+
+				return !_srgb && glesVersion >= 3;
+
 			// GLES2 float extension:
 			case TextureFormat::RGBA16F:
-				if (_writeOnly && emscripten_webgl_enable_extension(ctx, "EXT_color_buffer_half_float"))
+				if (_writeOnly && emscripten_webgl_enable_extension(ctx, "EXT_color_buffer_half_float") )
+				{
 					return true;
+				}
+				BX_FALLTHROUGH;
+
 			case TextureFormat::RGBA32F:
 				if (_writeOnly)
+				{
 					return emscripten_webgl_enable_extension(ctx, "EXT_color_buffer_float") || emscripten_webgl_enable_extension(ctx, "WEBGL_color_buffer_float");
-				return !_srgb && (glesVersion >= 3 || emscripten_webgl_enable_extension(ctx, "OES_texture_half_float")); // GLES3 formats without sRGB
+				}
+
+				// GLES3 formats without sRGB
+				return !_srgb
+					&& (glesVersion >= 3 || emscripten_webgl_enable_extension(ctx, "OES_texture_half_float") )
+					;
+
 			case TextureFormat::D24:
 			case TextureFormat::D24S8:
-				return !_srgb && (glesVersion >= 3 || (!_writeOnly && emscripten_webgl_enable_extension(ctx, "WEBGL_depth_texture"))); // GLES3 formats without sRGB, depth textures do not support mipmaps.
+				// GLES3 formats without sRGB, depth textures do not support mipmaps.
+				return !_srgb
+					&& (glesVersion >= 3 || (!_writeOnly && emscripten_webgl_enable_extension(ctx, "WEBGL_depth_texture") ) )
+					;
+
 			case TextureFormat::D32:
-				return !_srgb && !_writeOnly && (glesVersion >= 3 || emscripten_webgl_enable_extension(ctx, "WEBGL_depth_texture")); // GLES3 formats without sRGB, depth textures do not support mipmaps.
+				// GLES3 formats without sRGB, depth textures do not support mipmaps.
+				return !_srgb
+					&& !_writeOnly
+					&& (glesVersion >= 3 || emscripten_webgl_enable_extension(ctx, "WEBGL_depth_texture") )
+					;
+
 			// GLES3 textures
 			case TextureFormat::R8:
 			case TextureFormat::RG8:
@@ -1870,12 +1946,21 @@ namespace bgfx { namespace gl
 			case TextureFormat::D16F:
 			case TextureFormat::D24F:
 			case TextureFormat::D32F:
-				return !_srgb && glesVersion >= 3;
+				return !_srgb
+					&& glesVersion >= 3
+					;
+
 			case TextureFormat::BGRA8:
-				return !_srgb && _writeOnly && glesVersion >= 3;
+				return !_srgb
+					&& _writeOnly
+					&& glesVersion >= 3
+					;
+
 			default:
-				return false;
+				break;
 		}
+
+		return false;
 	}
 #endif
 
@@ -1889,7 +1974,8 @@ namespace bgfx { namespace gl
 #if BX_PLATFORM_EMSCRIPTEN
 		// On web platform read the validity of framebuffers based on the available GL context and extensions
 		// to avoid developer unfriendly console error noise that would come from probing.
-		return isFramebufferFormatValidPerSpec(_format, _srgb, _writeOnly, _dim);
+		BX_UNUSED(_dim);
+		return isFramebufferFormatValidPerSpec(_format, _srgb, _writeOnly);
 #else
 		// On other platforms probe the supported textures.
 		const TextureFormatInfo& tfi = s_textureFormat[_format];
@@ -2181,7 +2267,6 @@ namespace bgfx { namespace gl
 				GL_GET(GL_MAX_RENDERBUFFER_SIZE, 1);
 				GL_GET(GL_MAX_COLOR_ATTACHMENTS, 1);
 				GL_GET(GL_MAX_DRAW_BUFFERS, 1);
-				GL_GET(GL_MAX_LABEL_LENGTH, 0);
 
 #undef GL_GET
 
@@ -2397,7 +2482,7 @@ namespace bgfx { namespace gl
 					if (BX_ENABLED(BX_PLATFORM_EMSCRIPTEN)
 						&& (s_extension[Extension::WEBGL_depth_texture].m_supported
 						|| s_extension[Extension::MOZ_WEBGL_depth_texture].m_supported
-						|| s_extension[Extension::WEBKIT_WEBGL_depth_texture].m_supported))
+						|| s_extension[Extension::WEBKIT_WEBGL_depth_texture].m_supported) )
 					{
 						setTextureFormat(TextureFormat::D16,   GL_DEPTH_COMPONENT, GL_DEPTH_COMPONENT, GL_UNSIGNED_SHORT);
 						setTextureFormat(TextureFormat::D24,   GL_DEPTH_COMPONENT, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT); // N.b. OpenGL ES does not guarantee that there are 24 bits available here, could be 16. See https://www.khronos.org/registry/webgl/extensions/WEBGL_depth_texture/
@@ -3023,7 +3108,7 @@ namespace bgfx { namespace gl
 				if (m_needPresent)
 				{
 					// Ensure the back buffer is bound as the source of the flip
-					GL_CHECK(glBindFramebuffer(GL_FRAMEBUFFER, m_backBufferFbo));
+					GL_CHECK(glBindFramebuffer(GL_FRAMEBUFFER, m_backBufferFbo) );
 
 					m_glctx.swap();
 					m_needPresent = false;
@@ -3401,7 +3486,7 @@ namespace bgfx { namespace gl
 				break;
 
 			default:
-				BX_CHECK(false, "Invalid handle type?! %d", _handle.type);
+				BX_ASSERT(false, "Invalid handle type?! %d", _handle.type);
 				break;
 			}
 		}
@@ -3659,7 +3744,7 @@ namespace bgfx { namespace gl
 					;
 				GL_CHECK(glFramebufferRenderbuffer(GL_FRAMEBUFFER, attachment, GL_RENDERBUFFER, m_msaaBackBufferRbos[1]) );
 
-				BX_CHECK(GL_FRAMEBUFFER_COMPLETE ==  glCheckFramebufferStatus(GL_FRAMEBUFFER)
+				BX_ASSERT(GL_FRAMEBUFFER_COMPLETE ==  glCheckFramebufferStatus(GL_FRAMEBUFFER)
 					, "glCheckFramebufferStatus failed 0x%08x"
 					, glCheckFramebufferStatus(GL_FRAMEBUFFER)
 					);
@@ -4043,7 +4128,7 @@ namespace bgfx { namespace gl
 					break;
 				case UniformType::Vec4:
 					if (num > 1) setUniform4fv(loc, num, (float*)data);
-					else setUniform4f(loc, ((float*)data)[0], ((float*)data)[1], ((float*)data)[2], ((float*)data)[3]);
+					else setUniform4f(loc, ( (float*)data)[0], ( (float*)data)[1], ( (float*)data)[2], ( (float*)data)[3]);
 					break;
 #else
 				CASE_IMPLEMENT_UNIFORM(Sampler, 1iv, I, int);
@@ -4237,7 +4322,7 @@ namespace bgfx { namespace gl
 		// already set to a shader program
 		void setUniform1i(uint32_t loc, int value)
 		{
-			if (m_uniformStateCache.updateUniformCache(loc, value))
+			if (m_uniformStateCache.updateUniformCache(loc, value) )
 			{
 				GL_CHECK(glUniform1i(loc, value) );
 			}
@@ -4248,7 +4333,7 @@ namespace bgfx { namespace gl
 			bool changed = false;
 			for(int i = 0; i < num; ++i)
 			{
-				if (m_uniformStateCache.updateUniformCache(loc+i, data[i]))
+				if (m_uniformStateCache.updateUniformCache(loc+i, data[i]) )
 				{
 					changed = true;
 				}
@@ -4262,9 +4347,9 @@ namespace bgfx { namespace gl
 		void setUniform4f(uint32_t loc, float x, float y, float z, float w)
 		{
 			UniformStateCache::f4 f; f.val[0] = x; f.val[1] = y; f.val[2] = z; f.val[3] = w;
-			if (m_uniformStateCache.updateUniformCache(loc, f))
+			if (m_uniformStateCache.updateUniformCache(loc, f) )
 			{
-				GL_CHECK(glUniform4f(loc, x, y, z, w));
+				GL_CHECK(glUniform4f(loc, x, y, z, w) );
 			}
 		}
 
@@ -4273,7 +4358,7 @@ namespace bgfx { namespace gl
 			bool changed = false;
 			for(int i = 0; i < num; ++i)
 			{
-				if (m_uniformStateCache.updateUniformCache(loc+i, *(const UniformStateCache::f4*)&data[4*i]))
+				if (m_uniformStateCache.updateUniformCache(loc+i, *(const UniformStateCache::f4*)&data[4*i]) )
 				{
 					changed = true;
 				}
@@ -4289,7 +4374,7 @@ namespace bgfx { namespace gl
 			bool changed = false;
 			for(int i = 0; i < num; ++i)
 			{
-				if (m_uniformStateCache.updateUniformCache(loc+i, *(const UniformStateCache::f3x3*)&data[9*i]))
+				if (m_uniformStateCache.updateUniformCache(loc+i, *(const UniformStateCache::f3x3*)&data[9*i]) )
 				{
 					changed = true;
 				}
@@ -4305,7 +4390,7 @@ namespace bgfx { namespace gl
 			bool changed = false;
 			for(int i = 0; i < num; ++i)
 			{
-				if (m_uniformStateCache.updateUniformCache(loc+i, *(const UniformStateCache::f4x4*)&data[16*i]))
+				if (m_uniformStateCache.updateUniformCache(loc+i, *(const UniformStateCache::f4x4*)&data[16*i]) )
 				{
 					changed = true;
 				}
@@ -4413,7 +4498,7 @@ namespace bgfx { namespace gl
 	static void frameBufferValidate()
 	{
 		GLenum complete = glCheckFramebufferStatus(GL_FRAMEBUFFER);
-		BX_CHECK(GL_FRAMEBUFFER_COMPLETE == complete
+		BX_ASSERT(GL_FRAMEBUFFER_COMPLETE == complete
 			, "glCheckFramebufferStatus failed 0x%08x: %s"
 			, complete
 			, glEnumName(complete)
@@ -4487,7 +4572,7 @@ namespace bgfx { namespace gl
 
 #undef GLSL_TYPE
 
-		BX_CHECK(false, "Unknown GLSL type? %x", _type);
+		BX_ASSERT(false, "Unknown GLSL type? %x", _type);
 		return "UNKNOWN GLSL TYPE!";
 	}
 
@@ -4584,7 +4669,7 @@ namespace bgfx { namespace gl
 			return UniformType::Sampler;
 		};
 
-		BX_CHECK(false, "Unrecognized GL type 0x%04x.", _type);
+		BX_ASSERT(false, "Unrecognized GL type 0x%04x.", _type);
 		return UniformType::End;
 	}
 
@@ -4947,7 +5032,7 @@ namespace bgfx { namespace gl
 				m_used[used++] = ii;
 			}
 		}
-		BX_CHECK(used < BX_COUNTOF(m_used), "Out of bounds %d > array size %d.", used, Attrib::Count);
+		BX_ASSERT(used < BX_COUNTOF(m_used), "Out of bounds %d > array size %d.", used, Attrib::Count);
 		m_usedCount = (uint8_t)used;
 
 		used = 0;
@@ -4960,7 +5045,7 @@ namespace bgfx { namespace gl
 				m_instanceData[used++] = loc;
 			}
 		}
-		BX_CHECK(used < BX_COUNTOF(m_instanceData), "Out of bounds %d > array size %d."
+		BX_ASSERT(used < BX_COUNTOF(m_instanceData), "Out of bounds %d > array size %d."
 				, used
 				, BX_COUNTOF(m_instanceData)
 				);
@@ -5022,7 +5107,7 @@ namespace bgfx { namespace gl
 	{
 		for(uint32_t ii = 0, iiEnd = m_usedCount; ii < iiEnd; ++ii)
 		{
-			if(Attrib::Count == m_unboundUsedAttrib[ii])
+			if (Attrib::Count == m_unboundUsedAttrib[ii])
 			{
 				Attrib::Enum attr = Attrib::Enum(m_used[ii]);
 				GLint loc = m_attributes[attr];
@@ -5086,7 +5171,7 @@ namespace bgfx { namespace gl
 		if (!writeOnly)
 		{
 			GL_CHECK(glGenTextures(1, &m_id) );
-			BX_CHECK(0 != m_id, "Failed to generate texture id.");
+			BX_ASSERT(0 != m_id, "Failed to generate texture id.");
 			GL_CHECK(glBindTexture(_target, m_id) );
 			GL_CHECK(glPixelStorei(GL_UNPACK_ALIGNMENT, 1) );
 
@@ -5181,7 +5266,7 @@ namespace bgfx { namespace gl
 			&& (0 != msaaQuality || writeOnly) )
 			{
 				GL_CHECK(glGenRenderbuffers(1, &m_rbo) );
-				BX_CHECK(0 != m_rbo, "Failed to generate renderbuffer id.");
+				BX_ASSERT(0 != m_rbo, "Failed to generate renderbuffer id.");
 				GL_CHECK(glBindRenderbuffer(GL_RENDERBUFFER, m_rbo) );
 
 				if (0 == msaaQuality)
@@ -5940,7 +6025,7 @@ namespace bgfx { namespace gl
 						}
 						else
 						{
-							if(s_extension[Extension::EXT_shader_texture_lod].m_supported)
+							if (s_extension[Extension::EXT_shader_texture_lod].m_supported)
 							{
 								bx::write(&writer
 									, "#extension GL_EXT_shader_texture_lod : enable\n"
@@ -6363,23 +6448,12 @@ namespace bgfx { namespace gl
 
 			if (0 == compiled)
 			{
-				LineReader lineReader(code);
-				bx::Error err;
-				for (int32_t line = 1; err.isOk(); ++line)
+				bx::LineReader lineReader(code);
+				for (int32_t line = 1; !lineReader.isDone(); ++line)
 				{
-					char str[4096];
-					int32_t len = bx::read(&lineReader, str, BX_COUNTOF(str)-1, &err);
-
-					if (err.isOk() )
-					{
-						str[len] = '\0';
-						bx::StringView eol = bx::strFindEol(str);
-						if (eol.getPtr() != str)
-						{
-							*const_cast<char*>(eol.getPtr() ) = '\0';
-						}
-						BX_TRACE("%3d %s", line, str);
-					}
+					bx::StringView str = lineReader.next();
+					BX_TRACE("%3d %.*s", line, str.getLength(), str.getPtr() );
+					BX_UNUSED(str);
 				}
 
 				GLsizei len;
@@ -6506,7 +6580,7 @@ namespace bgfx { namespace gl
 					else
 					{
 						if (1 < texture.m_numLayers
-						&&  !texture.isCubeMap())
+						&&  !texture.isCubeMap() )
 						{
 							GL_CHECK(glFramebufferTextureLayer(GL_FRAMEBUFFER
 								, attachment
@@ -6784,7 +6858,7 @@ namespace bgfx { namespace gl
 			{
 				const TextureGL& texture = s_renderGL->m_textures[at.handle.idx];
 
-				if(0 != (texture.m_flags&BGFX_TEXTURE_COMPUTE_WRITE))
+				if (0 != (texture.m_flags&BGFX_TEXTURE_COMPUTE_WRITE) )
 				{
 					GL_CHECK(glBindImageTexture(ii
 						, texture.m_id
@@ -7415,7 +7489,7 @@ namespace bgfx { namespace gl
 				{
 					if (BGFX_STATE_FRONT_CCW & changedFlags)
 					{
-						GL_CHECK(glFrontFace((BGFX_STATE_FRONT_CCW & newFlags) ? GL_CCW : GL_CW) );
+						GL_CHECK(glFrontFace( (BGFX_STATE_FRONT_CCW & newFlags) ? GL_CCW : GL_CW) );
 					}
 
 					if (BGFX_STATE_CULL_MASK & changedFlags)
@@ -7995,7 +8069,7 @@ namespace bgfx { namespace gl
 							m_occlusionQuery.end();
 						}
 
-						if(isValid(draw.m_instanceDataBuffer))
+						if (isValid(draw.m_instanceDataBuffer) )
 						{
 							program.unbindInstanceData();
 						}
