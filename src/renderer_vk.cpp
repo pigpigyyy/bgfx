@@ -1131,6 +1131,7 @@ VK_IMPORT_DEVICE
 		{
 			VK_CHECK(vkDeviceWaitIdle(m_device) );
 			vkFreeMemory(m_device, m_backBufferDepthStencilMemory, m_allocatorCb);
+			m_backBufferDepthStencilMemory = VK_NULL_HANDLE;
 			vkDestroy(m_backBufferDepthStencilImageView);
 			vkDestroy(m_backBufferDepthStencilImage);
 			for (uint32_t ii = 0; ii < BX_COUNTOF(m_backBufferColorImageView); ++ii)
@@ -1304,13 +1305,13 @@ VK_IMPORT_DEVICE
 
 			m_vulkan1Dll = bx::dlopen(
 #if BX_PLATFORM_WINDOWS
-					"vulkan-1.dll"
+				"vulkan-1.dll"
 #elif BX_PLATFORM_ANDROID
-					"libvulkan.so"
+				"libvulkan.so"
 #elif BX_PLATFORM_OSX
-					"libvulkan.dylib"
+				"libvulkan.dylib"
 #else
-					"libvulkan.so.1"
+				"libvulkan.so.1"
 #endif // BX_PLATFORM_*
 					);
 
@@ -1375,10 +1376,12 @@ VK_IMPORT
 				for (uint32_t ii = 0; ii < Extension::Count; ++ii)
 				{
 					const Extension& extension = s_extension[ii];
+					const LayerInfo& layerInfo = s_layer[extension.m_layer].m_instance;
 
-					bool layerEnabled = extension.m_layer == Layer::Count ||
-										(s_layer[extension.m_layer].m_instance.m_supported &&
-										 s_layer[extension.m_layer].m_instance.m_initialize);
+					const bool layerEnabled = false
+						|| extension.m_layer == Layer::Count
+						|| (layerInfo.m_supported && layerInfo.m_initialize)
+						;
 
 					if (extension.m_supported
 					&&  extension.m_initialize
@@ -1842,18 +1845,20 @@ VK_IMPORT_DEVICE
 				if (VK_SUCCESS != result)
 				{
 					void* xcbdll = bx::dlopen("libX11-xcb.so.1");
+
 					if (NULL != xcbdll)
 					{
 						typedef xcb_connection_t* (*PFN_XGETXCBCONNECTION)(Display*);
 						PFN_XGETXCBCONNECTION XGetXCBConnection = (PFN_XGETXCBCONNECTION)bx::dlsym(xcbdll, "XGetXCBConnection");
 
+						union { void* ptr; xcb_window_t window; } cast = { g_platformData.nwh };
+
 						VkXcbSurfaceCreateInfoKHR sci;
-						sci.sType = VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR;
-						sci.pNext = NULL;
+						sci.sType      = VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR;
+						sci.pNext      = NULL;
 						sci.flags      = 0;
 						sci.connection = XGetXCBConnection( (Display*)g_platformData.ndt);
-						union { void* ptr; xcb_window_t window; } cast = { g_platformData.nwh };
-						sci.window = cast.window;
+						sci.window     = cast.window;
 						result = vkCreateXcbSurfaceKHR(m_instance, &sci, m_allocatorCb, &m_surface);
 
 						bx::dlclose(xcbdll);
@@ -1864,13 +1869,17 @@ VK_IMPORT_DEVICE
 			{
 				if (NULL != vkCreateMacOSSurfaceMVK)
 				{
-					NSWindow* window = (NSWindow*)(g_platformData.nwh);
+					NSWindow* window    = (NSWindow*)(g_platformData.nwh);
 					NSView* contentView = (NSView*)window.contentView;
 					CAMetalLayer* layer = [CAMetalLayer layer];
+
 					if (_init.resolution.reset & BGFX_RESET_HIDPI)
+					{
 						layer.contentsScale = [window backingScaleFactor];
-					[contentView setWantsLayer : YES] ;
-					[contentView setLayer : layer] ;
+					}
+
+					[contentView setWantsLayer : YES];
+					[contentView setLayer : layer];
 
 					VkMacOSSurfaceCreateInfoMVK sci;
 					sci.sType = VK_STRUCTURE_TYPE_MACOS_SURFACE_CREATE_INFO_MVK;
@@ -1878,6 +1887,10 @@ VK_IMPORT_DEVICE
 					sci.flags = 0;
 					sci.pView = (__bridge void*)layer;
 					result = vkCreateMacOSSurfaceMVK(m_instance, &sci, m_allocatorCb, &m_surface);
+				}
+				else
+				{
+					result = VK_RESULT_MAX_ENUM;
 				}
 			}
 #else
@@ -2885,7 +2898,7 @@ VK_IMPORT_DEVICE
 			return idx;
 		}
 
-		void updateResolution(const Resolution& _resolution)
+		bool updateResolution(const Resolution& _resolution)
 		{
 			if (!!(_resolution.reset & BGFX_RESET_MAXANISOTROPY) )
 			{
@@ -2925,6 +2938,12 @@ VK_IMPORT_DEVICE
 				||  formatChanged
 				||  m_needToRefreshSwapchain)
 				{
+					for (uint32_t ii = 0; ii < BX_COUNTOF(m_backBufferColorImageView); ++ii)
+					{
+						vkDestroy(m_presentDone[ii]);
+						m_presentDone[ii] = VK_NULL_HANDLE;
+					}
+
 					VK_CHECK(vkDeviceWaitIdle(m_device) );
 					releaseSwapchainFramebuffer();
 					releaseSwapchainRenderPass();
@@ -2958,9 +2977,28 @@ VK_IMPORT_DEVICE
 						, surfaceCapabilities.maxImageExtent.height
 						);
 
+					// Prevent validation error when minimizing a window
+					if (m_sci.imageExtent.width == 0 || m_sci.imageExtent.height == 0)
+					{
+						m_resolution.width = 0;
+						m_resolution.height = 0;
+						return true;
+					}
+
 					VK_CHECK(createSwapchain() );
 					VK_CHECK(createSwapchainRenderPass() );
 					VK_CHECK(createSwapchainFramebuffer() );
+
+					VkSemaphoreCreateInfo sci;
+					sci.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+					sci.pNext = NULL;
+					sci.flags = 0;
+
+					for (uint32_t ii = 0; ii < m_numSwapchainImages; ++ii)
+					{
+						VK_CHECK(vkCreateSemaphore(m_device, &sci, m_allocatorCb, &m_presentDone[ii]));
+					}
+
 					initSwapchainImageLayout();
 
 					BX_TRACE("Swapchain (%s): %dx%d%s"
@@ -2971,6 +3009,13 @@ VK_IMPORT_DEVICE
 						);
 				}
 			}
+
+			if (m_needToRefreshSwapchain)
+			{
+				return true;
+			}
+
+			return false;
 		}
 
 		void setShaderUniform(uint8_t _flags, uint32_t _regIndex, const void* _val, uint32_t _numRegs)
@@ -5836,7 +5881,13 @@ VK_DESTROY
 		submitCommandAndWait(m_commandBuffer);
 		m_commandBuffer = VK_NULL_HANDLE;
 
-		updateResolution(_render->m_resolution);
+		if (updateResolution(_render->m_resolution) )
+		{
+			return;
+		}
+
+		if (m_swapchain == VK_NULL_HANDLE)
+			return;
 
 		int64_t timeBegin = bx::getHPCounter();
 		int64_t captureElapsed = 0;
@@ -6766,12 +6817,15 @@ BX_UNUSED(presentMin, presentMax);
 			beginRenderPass = false;
 		}
 
-		setImageMemoryBarrier(m_commandBuffer
+		setImageMemoryBarrier(
+			  m_commandBuffer
 			, m_backBufferColorImage[m_backBufferColorIdx]
 			, VK_IMAGE_ASPECT_COLOR_BIT
 			, m_backBufferColorImageLayout[m_backBufferColorIdx]
 			, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
-			, 1, 1);
+			, 1
+			, 1
+			);
 		m_backBufferColorImageLayout[m_backBufferColorIdx] = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 
 		VK_CHECK(vkEndCommandBuffer(m_commandBuffer) );

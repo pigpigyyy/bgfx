@@ -18,6 +18,7 @@
 #include <functional>
 #include <utility>
 
+#include "source/fuzz/protobufs/spirvfuzz_protobufs.h"
 #include "source/fuzz/random_generator.h"
 #include "source/opt/function.h"
 
@@ -128,6 +129,9 @@ class FuzzerContext {
   uint32_t GetChanceOfAddingGlobalVariable() {
     return chance_of_adding_global_variable_;
   }
+  uint32_t GetChanceOfAddingImageSampleUnusedComponents() {
+    return chance_of_adding_image_sample_unused_components_;
+  }
   uint32_t GetChanceOfAddingLoad() { return chance_of_adding_load_; }
   uint32_t GetChanceOfAddingLocalVariable() {
     return chance_of_adding_local_variable_;
@@ -140,6 +144,7 @@ class FuzzerContext {
   }
   uint32_t GetChanceOfAddingParameters() { return chance_of_adding_parameters; }
   uint32_t GetChanceOfAddingStore() { return chance_of_adding_store_; }
+  uint32_t GetChanceOfAddingSynonyms() { return chance_of_adding_synonyms_; }
   uint32_t GetChanceOfAddingVectorShuffle() {
     return chance_of_adding_vector_shuffle_;
   }
@@ -165,6 +170,9 @@ class FuzzerContext {
   uint32_t GetChanceOfChoosingStructTypeVsArrayType() {
     return chance_of_choosing_struct_type_vs_array_type_;
   }
+  uint32_t GetChanceOfChoosingWorkgroupStorageClass() {
+    return chance_of_choosing_workgroup_storage_class_;
+  }
   uint32_t GetChanceOfConstructingComposite() {
     return chance_of_constructing_composite_;
   }
@@ -174,6 +182,9 @@ class FuzzerContext {
   }
   uint32_t GetChanceOfGoingDeeperWhenMakingAccessChain() {
     return chance_of_going_deeper_when_making_access_chain_;
+  }
+  uint32_t GetChanceOfInterchangingZeroLikeConstants() {
+    return chance_of_interchanging_zero_like_constants_;
   }
   uint32_t GetChanceOfInvertingComparisonOperators() {
     return chance_of_inverting_comparison_operators_;
@@ -203,6 +214,9 @@ class FuzzerContext {
   }
   uint32_t GetChanceOfReplacingLinearAlgebraInstructions() {
     return chance_of_replacing_linear_algebra_instructions_;
+  }
+  uint32_t GetChanceOfReplacingParametersWithGlobals() {
+    return chance_of_replacing_parameters_with_globals_;
   }
   uint32_t GetChanceOfSplittingBlock() { return chance_of_splitting_block_; }
   uint32_t GetChanceOfSwappingConditionalBranchOperands() {
@@ -265,6 +279,12 @@ class FuzzerContext {
     // Ensure that the array size is non-zero.
     return random_generator_->RandomUint32(max_new_array_size_limit_ - 1) + 1;
   }
+  protobufs::TransformationAddSynonym::SynonymType GetRandomSynonymType();
+  uint32_t GetRandomUnusedComponentCountForImageSample(
+      uint32_t max_unused_component_count) {
+    // Ensure that the number of unused components is non-zero.
+    return random_generator_->RandomUint32(max_unused_component_count) + 1;
+  }
   bool GoDeeperInConstantObfuscation(uint32_t depth) {
     return go_deeper_in_constant_obfuscation_(depth, random_generator_);
   }
@@ -286,12 +306,14 @@ class FuzzerContext {
   uint32_t chance_of_adding_dead_continue_;
   uint32_t chance_of_adding_equation_instruction_;
   uint32_t chance_of_adding_global_variable_;
+  uint32_t chance_of_adding_image_sample_unused_components_;
   uint32_t chance_of_adding_load_;
   uint32_t chance_of_adding_local_variable_;
   uint32_t chance_of_adding_matrix_type_;
   uint32_t chance_of_adding_no_contraction_decoration_;
   uint32_t chance_of_adding_parameters;
   uint32_t chance_of_adding_store_;
+  uint32_t chance_of_adding_synonyms_;
   uint32_t chance_of_adding_vector_shuffle_;
   uint32_t chance_of_adding_vector_type_;
   uint32_t chance_of_adjusting_branch_weights_;
@@ -301,10 +323,12 @@ class FuzzerContext {
   uint32_t chance_of_adjusting_selection_control_;
   uint32_t chance_of_calling_function_;
   uint32_t chance_of_choosing_struct_type_vs_array_type_;
+  uint32_t chance_of_choosing_workgroup_storage_class_;
   uint32_t chance_of_constructing_composite_;
   uint32_t chance_of_copying_object_;
   uint32_t chance_of_donating_additional_module_;
   uint32_t chance_of_going_deeper_when_making_access_chain_;
+  uint32_t chance_of_interchanging_zero_like_constants_;
   uint32_t chance_of_inverting_comparison_operators_;
   uint32_t chance_of_making_donor_livesafe_;
   uint32_t chance_of_merging_blocks_;
@@ -316,6 +340,7 @@ class FuzzerContext {
   uint32_t chance_of_pushing_id_through_variable_;
   uint32_t chance_of_replacing_id_with_synonym_;
   uint32_t chance_of_replacing_linear_algebra_instructions_;
+  uint32_t chance_of_replacing_parameters_with_globals_;
   uint32_t chance_of_splitting_block_;
   uint32_t chance_of_swapping_conditional_branch_operands_;
   uint32_t chance_of_toggling_access_chain_instruction_;

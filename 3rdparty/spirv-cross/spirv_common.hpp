@@ -664,7 +664,7 @@ struct SPIREntryPoint
 	SmallVector<VariableID> interface_variables;
 
 	Bitset flags;
-	struct
+	struct WorkgroupSize
 	{
 		uint32_t x = 0, y = 0, z = 0;
 		uint32_t constant = 0; // Workgroup size can be expressed as a constant/spec-constant instead.
@@ -1554,6 +1554,7 @@ struct AccessChainMeta
 	bool need_transpose = false;
 	bool storage_is_packed = false;
 	bool storage_is_invariant = false;
+	bool flattened_struct = false;
 };
 
 enum ExtendedDecorations

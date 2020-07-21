@@ -46,6 +46,8 @@ if(SPIRV_BUILD_FUZZER)
         fuzzer_pass_add_equation_instructions.h
         fuzzer_pass_add_function_calls.h
         fuzzer_pass_add_global_variables.h
+        fuzzer_pass_add_image_sample_unused_components.h
+        fuzzer_pass_add_synonyms.h
         fuzzer_pass_add_loads.h
         fuzzer_pass_add_local_variables.h
         fuzzer_pass_add_no_contraction_decorations.h
@@ -62,6 +64,7 @@ if(SPIRV_BUILD_FUZZER)
         fuzzer_pass_copy_objects.h
         fuzzer_pass_donate_modules.h
         fuzzer_pass_invert_comparison_operators.h
+        fuzzer_pass_interchange_zero_like_constants.h
         fuzzer_pass_merge_blocks.h
         fuzzer_pass_obfuscate_constants.h
         fuzzer_pass_outline_functions.h
@@ -70,6 +73,7 @@ if(SPIRV_BUILD_FUZZER)
         fuzzer_pass_permute_phi_operands.h
         fuzzer_pass_push_ids_through_variables.h
         fuzzer_pass_replace_linear_algebra_instructions.h
+        fuzzer_pass_replace_parameter_with_global.h
         fuzzer_pass_split_blocks.h
         fuzzer_pass_swap_commutable_operands.h
         fuzzer_pass_swap_conditional_branch_operands.h
@@ -96,10 +100,12 @@ if(SPIRV_BUILD_FUZZER)
         transformation_add_function.h
         transformation_add_global_undef.h
         transformation_add_global_variable.h
+        transformation_add_image_sample_unused_components.h
         transformation_add_local_variable.h
         transformation_add_no_contraction_decoration.h
         transformation_add_parameter.h
         transformation_add_spec_constant_op.h
+        transformation_add_synonym.h
         transformation_add_type_array.h
         transformation_add_type_boolean.h
         transformation_add_type_float.h
@@ -114,7 +120,6 @@ if(SPIRV_BUILD_FUZZER)
         transformation_composite_extract.h
         transformation_compute_data_synonym_fact_closure.h
         transformation_context.h
-        transformation_copy_object.h
         transformation_equation_instruction.h
         transformation_function_call.h
         transformation_invert_comparison_operator.h
@@ -125,10 +130,12 @@ if(SPIRV_BUILD_FUZZER)
         transformation_permute_function_parameters.h
         transformation_permute_phi_operands.h
         transformation_push_id_through_variable.h
+        transformation_record_synonymous_constants.h
         transformation_replace_boolean_constant_with_constant_binary.h
         transformation_replace_constant_with_uniform.h
         transformation_replace_id_with_synonym.h
         transformation_replace_linear_algebra_instruction.h
+        transformation_replace_parameter_with_global.h
         transformation_set_function_control.h
         transformation_set_loop_control.h
         transformation_set_memory_operands_mask.h
@@ -158,6 +165,8 @@ if(SPIRV_BUILD_FUZZER)
         fuzzer_pass_add_equation_instructions.cpp
         fuzzer_pass_add_function_calls.cpp
         fuzzer_pass_add_global_variables.cpp
+        fuzzer_pass_add_image_sample_unused_components.cpp
+        fuzzer_pass_add_synonyms.cpp
         fuzzer_pass_add_loads.cpp
         fuzzer_pass_add_local_variables.cpp
         fuzzer_pass_add_no_contraction_decorations.cpp
@@ -174,6 +183,7 @@ if(SPIRV_BUILD_FUZZER)
         fuzzer_pass_copy_objects.cpp
         fuzzer_pass_donate_modules.cpp
         fuzzer_pass_invert_comparison_operators.cpp
+        fuzzer_pass_interchange_zero_like_constants.cpp
         fuzzer_pass_merge_blocks.cpp
         fuzzer_pass_obfuscate_constants.cpp
         fuzzer_pass_outline_functions.cpp
@@ -182,6 +192,7 @@ if(SPIRV_BUILD_FUZZER)
         fuzzer_pass_permute_phi_operands.cpp
         fuzzer_pass_push_ids_through_variables.cpp
         fuzzer_pass_replace_linear_algebra_instructions.cpp
+        fuzzer_pass_replace_parameter_with_global.cpp
         fuzzer_pass_split_blocks.cpp
         fuzzer_pass_swap_commutable_operands.cpp
         fuzzer_pass_swap_conditional_branch_operands.cpp
@@ -207,10 +218,12 @@ if(SPIRV_BUILD_FUZZER)
         transformation_add_function.cpp
         transformation_add_global_undef.cpp
         transformation_add_global_variable.cpp
+        transformation_add_image_sample_unused_components.cpp
         transformation_add_local_variable.cpp
         transformation_add_no_contraction_decoration.cpp
         transformation_add_parameter.cpp
         transformation_add_spec_constant_op.cpp
+        transformation_add_synonym.cpp
         transformation_add_type_array.cpp
         transformation_add_type_boolean.cpp
         transformation_add_type_float.cpp
@@ -225,7 +238,6 @@ if(SPIRV_BUILD_FUZZER)
         transformation_composite_extract.cpp
         transformation_compute_data_synonym_fact_closure.cpp
         transformation_context.cpp
-        transformation_copy_object.cpp
         transformation_equation_instruction.cpp
         transformation_function_call.cpp
         transformation_invert_comparison_operator.cpp
@@ -236,10 +248,12 @@ if(SPIRV_BUILD_FUZZER)
         transformation_permute_function_parameters.cpp
         transformation_permute_phi_operands.cpp
         transformation_push_id_through_variable.cpp
+        transformation_record_synonymous_constants.cpp
         transformation_replace_boolean_constant_with_constant_binary.cpp
         transformation_replace_constant_with_uniform.cpp
         transformation_replace_id_with_synonym.cpp
         transformation_replace_linear_algebra_instruction.cpp
+        transformation_replace_parameter_with_global.cpp
         transformation_set_function_control.cpp
         transformation_set_loop_control.cpp
         transformation_set_memory_operands_mask.cpp
