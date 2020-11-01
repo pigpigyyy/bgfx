@@ -635,6 +635,7 @@ namespace bgfx { namespace gl
 			OES_depth_texture,
 			OES_element_index_uint,
 			OES_fragment_precision_high,
+			OES_fbo_render_mipmap,
 			OES_get_program_binary,
 			OES_required_internalformat,
 			OES_packed_depth_stencil,
@@ -847,6 +848,7 @@ namespace bgfx { namespace gl
 		{ "OES_depth_texture",                        false,                             true  },
 		{ "OES_element_index_uint",                   false,                             true  },
 		{ "OES_fragment_precision_high",              false,                             true  },
+		{ "OES_fbo_render_mipmap",                    false,                             true  },
 		{ "OES_get_program_binary",                   false,                             true  },
 		{ "OES_required_internalformat",              false,                             true  },
 		{ "OES_packed_depth_stencil",                 false,                             true  },
@@ -2088,8 +2090,13 @@ namespace bgfx { namespace gl
 			{
 				if (0 == bx::strCmp(ext, extension.m_name) )
 				{
-					extension.m_supported = true;
+#if BX_PLATFORM_EMSCRIPTEN
+					EMSCRIPTEN_WEBGL_CONTEXT_HANDLE ctx = emscripten_webgl_get_current_context();
+					supported = emscripten_webgl_enable_extension(ctx, extension.m_name);
+#else
 					supported = true;
+#endif
+					extension.m_supported = supported;
 					break;
 				}
 			}
