@@ -1,5 +1,5 @@
 /*
- * Copyright 2019-2020 Hans-Kristian Arntzen
+ * Copyright 2019-2021 Hans-Kristian Arntzen
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,6 +12,13 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ */
+
+/*
+ * At your option, you may choose to accept this material under either:
+ *  1. The Apache License, Version 2.0, found at <http://www.apache.org/licenses/LICENSE-2.0>, or
+ *  2. The MIT License, found at <http://opensource.org/licenses/MIT>.
+ * SPDX-License-Identifier: Apache-2.0 OR MIT.
  */
 
 #include "spirv_cross_c.h"
@@ -693,6 +700,10 @@ spvc_result spvc_compiler_options_set_uint(spvc_compiler_options options, spvc_c
 
 	case SPVC_COMPILER_OPTION_MSL_FORCE_SAMPLE_RATE_SHADING:
 		options->msl.force_sample_rate_shading = value != 0;
+		break;
+
+	case SPVC_COMPILER_OPTION_MSL_IOS_SUPPORT_BASE_VERTEX_INSTANCE:
+		options->msl.ios_support_base_vertex_instance = value != 0;
 		break;
 #endif
 

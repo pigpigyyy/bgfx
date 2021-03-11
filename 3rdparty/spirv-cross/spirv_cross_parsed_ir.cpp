@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020 Arm Limited
+ * Copyright 2018-2021 Arm Limited
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,6 +12,13 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ */
+
+/*
+ * At your option, you may choose to accept this material under either:
+ *  1. The Apache License, Version 2.0, found at <http://www.apache.org/licenses/LICENSE-2.0>, or
+ *  2. The MIT License, found at <http://opensource.org/licenses/MIT>.
+ * SPDX-License-Identifier: Apache-2.0 OR MIT.
  */
 
 #include "spirv_cross_parsed_ir.hpp"
@@ -226,6 +233,11 @@ static bool is_reserved_identifier(const string &name, bool member, bool allow_r
 bool ParsedIR::is_globally_reserved_identifier(std::string &str, bool allow_reserved_prefixes)
 {
 	return is_reserved_identifier(str, false, allow_reserved_prefixes);
+}
+
+uint32_t ParsedIR::get_spirv_version() const
+{
+	return spirv[1];
 }
 
 static string make_unreserved_identifier(const string &name)

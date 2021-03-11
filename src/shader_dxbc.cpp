@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2020 Branimir Karadzic. All rights reserved.
+ * Copyright 2011-2021 Branimir Karadzic. All rights reserved.
  * License: https://github.com/bkaradzic/bgfx#license-bsd-2-clause
  */
 
@@ -2055,8 +2055,8 @@ namespace bgfx
 			case DXBC_CHUNK_STAT: // Statistics.
 				chunkOffset[idx] = uint32_t(bx::seek(_writer) - dxbcOffset);
 				size += bx::write(_writer, DXBC_CHUNK_STAT, _err);
-				size += bx::write(_writer, uint32_t(_dxbc.rdef.rdefCode.size()), _err);
-				chunkSize[idx] = bx::write(_writer, _dxbc.rdef.rdefCode.data(), int32_t(_dxbc.rdef.rdefCode.size() ), _err);
+				size += bx::write(_writer, uint32_t(_dxbc.stat.statCode.size()), _err);
+				chunkSize[idx] = bx::write(_writer, _dxbc.stat.statCode.data(), int32_t(_dxbc.stat.statCode.size() ), _err);
 				size += chunkSize[idx++];
 				break;
 

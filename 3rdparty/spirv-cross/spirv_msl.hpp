@@ -1,5 +1,5 @@
 /*
- * Copyright 2016-2020 The Brenwill Workshop Ltd.
+ * Copyright 2016-2021 The Brenwill Workshop Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,6 +12,13 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ */
+
+/*
+ * At your option, you may choose to accept this material under either:
+ *  1. The Apache License, Version 2.0, found at <http://www.apache.org/licenses/LICENSE-2.0>, or
+ *  2. The MIT License, found at <http://opensource.org/licenses/MIT>.
+ * SPDX-License-Identifier: Apache-2.0 OR MIT.
  */
 
 #ifndef SPIRV_CROSS_MSL_HPP
@@ -728,6 +735,12 @@ protected:
 	void declare_undefined_values() override;
 	void declare_constant_arrays();
 
+	void replace_illegal_entry_point_names();
+	void sync_entry_point_aliases_and_names();
+
+	static const std::unordered_set<std::string> &get_reserved_keyword_set();
+	static const std::unordered_set<std::string> &get_illegal_func_names();
+
 	// Constant arrays of non-primitive types (i.e. matrices) won't link properly into Metal libraries
 	void declare_complex_constant_arrays();
 
@@ -1013,6 +1026,7 @@ protected:
 	void activate_argument_buffer_resources();
 
 	bool type_is_msl_framebuffer_fetch(const SPIRType &type) const;
+	bool is_supported_argument_buffer_type(const SPIRType &type) const;
 
 	// OpcodeHandler that handles several MSL preprocessing operations.
 	struct OpCodePreprocessor : OpcodeHandler
