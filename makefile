@@ -171,9 +171,9 @@ vs2017-winstore100-release64: .build/projects/vs2017-winstore100 ## Build - vs20
 vs2017-winstore100: vs2017-winstore100-debug32 vs2017-winstore100-release32 vs2017-winstore100-debug64 vs2017-winstore100-release64 ## Build - vs2017-winstore100 x86/x64 Debug and Release
 
 .build/projects/gmake-osx-x64:
-	$(GENIE) --with-tools --with-combined-examples --with-shared-lib --gcc=osx-x64 gmake
+	$(GENIE) --gcc=osx-x64 gmake
 .build/projects/gmake-osx-arm64:
-	$(GENIE) --with-tools --with-combined-examples --with-shared-lib --gcc=osx-arm64 gmake
+	$(GENIE) --gcc=osx-arm64 gmake
 
 osx-debug: osx-x64-debug osx-arm64-debug ## Build - macOS Universal Debug
 osx-release: osx-x64-release osx-arm64-release ## Build - macOS Universal Release
