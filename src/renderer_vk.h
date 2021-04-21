@@ -73,18 +73,18 @@
 			VK_IMPORT_INSTANCE_FUNC(false, vkGetPhysicalDeviceProperties);             \
 			VK_IMPORT_INSTANCE_FUNC(false, vkGetPhysicalDeviceFormatProperties);       \
 			VK_IMPORT_INSTANCE_FUNC(false, vkGetPhysicalDeviceFeatures);               \
-			VK_IMPORT_INSTANCE_FUNC(false, vkGetPhysicalDeviceFeatures2KHR);           \
+			VK_IMPORT_INSTANCE_FUNC(true,  vkGetPhysicalDeviceFeatures2KHR);           \
 			VK_IMPORT_INSTANCE_FUNC(false, vkGetPhysicalDeviceImageFormatProperties);  \
 			VK_IMPORT_INSTANCE_FUNC(false, vkGetPhysicalDeviceMemoryProperties);       \
 			VK_IMPORT_INSTANCE_FUNC(true,  vkGetPhysicalDeviceMemoryProperties2KHR);   \
 			VK_IMPORT_INSTANCE_FUNC(false, vkGetPhysicalDeviceQueueFamilyProperties);  \
-			VK_IMPORT_INSTANCE_FUNC(false, vkGetPhysicalDeviceSurfaceCapabilitiesKHR); \
-			VK_IMPORT_INSTANCE_FUNC(false, vkGetPhysicalDeviceSurfaceFormatsKHR);      \
-			VK_IMPORT_INSTANCE_FUNC(false, vkGetPhysicalDeviceSurfacePresentModesKHR); \
-			VK_IMPORT_INSTANCE_FUNC(false, vkGetPhysicalDeviceSurfaceSupportKHR);      \
+			VK_IMPORT_INSTANCE_FUNC(true,  vkGetPhysicalDeviceSurfaceCapabilitiesKHR); \
+			VK_IMPORT_INSTANCE_FUNC(true,  vkGetPhysicalDeviceSurfaceFormatsKHR);      \
+			VK_IMPORT_INSTANCE_FUNC(true,  vkGetPhysicalDeviceSurfacePresentModesKHR); \
+			VK_IMPORT_INSTANCE_FUNC(true,  vkGetPhysicalDeviceSurfaceSupportKHR);      \
 			VK_IMPORT_INSTANCE_FUNC(false, vkCreateDevice);                            \
 			VK_IMPORT_INSTANCE_FUNC(false, vkDestroyDevice);                           \
-			VK_IMPORT_INSTANCE_FUNC(false, vkDestroySurfaceKHR);                       \
+			VK_IMPORT_INSTANCE_FUNC(true,  vkDestroySurfaceKHR);                       \
 			/* VK_EXT_debug_report */                                                  \
 			VK_IMPORT_INSTANCE_FUNC(true,  vkCreateDebugReportCallbackEXT);            \
 			VK_IMPORT_INSTANCE_FUNC(true,  vkDestroyDebugReportCallbackEXT);           \
@@ -93,11 +93,11 @@
 
 #define VK_IMPORT_DEVICE                                                   \
 			VK_IMPORT_DEVICE_FUNC(false, vkGetDeviceQueue);                \
-			VK_IMPORT_DEVICE_FUNC(false, vkCreateSwapchainKHR);            \
-			VK_IMPORT_DEVICE_FUNC(false, vkDestroySwapchainKHR);           \
-			VK_IMPORT_DEVICE_FUNC(false, vkGetSwapchainImagesKHR);         \
-			VK_IMPORT_DEVICE_FUNC(false, vkAcquireNextImageKHR);           \
-			VK_IMPORT_DEVICE_FUNC(false, vkQueuePresentKHR);               \
+			VK_IMPORT_DEVICE_FUNC(true,  vkCreateSwapchainKHR);            \
+			VK_IMPORT_DEVICE_FUNC(true,  vkDestroySwapchainKHR);           \
+			VK_IMPORT_DEVICE_FUNC(true,  vkGetSwapchainImagesKHR);         \
+			VK_IMPORT_DEVICE_FUNC(true,  vkAcquireNextImageKHR);           \
+			VK_IMPORT_DEVICE_FUNC(true,  vkQueuePresentKHR);               \
 			VK_IMPORT_DEVICE_FUNC(false, vkCreateFence);                   \
 			VK_IMPORT_DEVICE_FUNC(false, vkDestroyFence);                  \
 			VK_IMPORT_DEVICE_FUNC(false, vkCreateSemaphore);               \
@@ -289,8 +289,11 @@ namespace bgfx { namespace vk
 		const ::Vk##_name* operator &() const { return &vk; }    \
 	};                                                           \
 	BX_STATIC_ASSERT(sizeof(::Vk##_name) == sizeof(Vk##_name) ); \
-	void vkDestroy(Vk##_name&)
+	void vkDestroy(Vk##_name&);                                  \
+	void release(Vk##_name&)
 VK_DESTROY
+VK_DESTROY_FUNC(DeviceMemory);
+VK_DESTROY_FUNC(SurfaceKHR);
 #undef VK_DESTROY_FUNC
 
 	struct DslBinding
@@ -332,7 +335,7 @@ VK_DESTROY
 			typename HashMap::iterator it = m_hashMap.find(_key);
 			if (it != m_hashMap.end() )
 			{
-				destroy(it->second);
+				release(it->second);
 				m_hashMap.erase(it);
 			}
 		}
@@ -341,7 +344,7 @@ VK_DESTROY
 		{
 			for (typename HashMap::iterator it = m_hashMap.begin(), itEnd = m_hashMap.end(); it != itEnd; ++it)
 			{
-				destroy(it->second);
+				release(it->second);
 			}
 
 			m_hashMap.clear();
@@ -353,8 +356,6 @@ VK_DESTROY
 		}
 
 	private:
-		void destroy(Ty handle);
-
 		typedef stl::unordered_map<uint64_t, Ty> HashMap;
 		HashMap m_hashMap;
 	};
@@ -446,6 +447,12 @@ VK_DESTROY
 		BindType::Enum type;
 		uint32_t binding;
 		uint32_t samplerBinding;
+		uint32_t index;
+	};
+
+	struct TextureBindInfo
+	{
+		VkImageViewType type;
 	};
 
 	struct ShaderVK
@@ -480,6 +487,10 @@ VK_DESTROY
 		uint8_t m_numAttrs;
 
 		BindInfo m_bindInfo[BGFX_CONFIG_MAX_TEXTURE_SAMPLERS];
+
+		TextureBindInfo m_textures[BGFX_CONFIG_MAX_TEXTURE_SAMPLERS];
+		uint8_t m_numTextures;
+
 		uint32_t m_uniformBinding;
 		uint16_t m_numBindings;
 		VkDescriptorSetLayoutBinding m_bindings[32];
@@ -502,6 +513,9 @@ VK_DESTROY
 		const ShaderVK* m_fsh;
 
 		BindInfo m_bindInfo[BGFX_CONFIG_MAX_TEXTURE_SAMPLERS];
+
+		TextureBindInfo m_textures[BGFX_CONFIG_MAX_TEXTURE_SAMPLERS];
+		uint8_t m_numTextures;
 
 		PredefinedUniform m_predefined[PredefinedUniform::Count * 2];
 		uint8_t m_numPredefined;
@@ -594,24 +608,26 @@ VK_DESTROY
 			, m_format(VK_FORMAT_UNDEFINED)
 			, m_textureImage(VK_NULL_HANDLE)
 			, m_textureDeviceMem(VK_NULL_HANDLE)
-			, m_textureImageView(VK_NULL_HANDLE)
-			, m_textureImageDepthView(VK_NULL_HANDLE)
 			, m_currentImageLayout(VK_IMAGE_LAYOUT_UNDEFINED)
 			, m_singleMsaaImage(VK_NULL_HANDLE)
 			, m_singleMsaaDeviceMem(VK_NULL_HANDLE)
-			, m_singleMsaaImageView(VK_NULL_HANDLE)
+			, m_currentSingleMsaaImageLayout(VK_IMAGE_LAYOUT_UNDEFINED)
 		{
 		}
 
 		void* create(VkCommandBuffer _commandBuffer, const Memory* _mem, uint64_t _flags, uint8_t _skip);
+		// internal render target
+		VkResult create(VkCommandBuffer _commandBuffer, uint32_t _width, uint32_t _height, uint64_t _flags, VkFormat _format, VkImageAspectFlags _aspectMask);
+
 		void destroy();
+
 		void update(VkCommandBuffer _commandBuffer, uint8_t _side, uint8_t _mip, const Rect& _rect, uint16_t _z, uint16_t _depth, uint16_t _pitch, const Memory* _mem);
-		void resolve(VkCommandBuffer _commandBuffer, uint8_t _resolve);
+		void resolve(VkCommandBuffer _commandBuffer, uint8_t _resolve, uint32_t _layer, uint32_t _numLayers, uint32_t _mip);
 
 		void copyBufferToTexture(VkCommandBuffer _commandBuffer, VkBuffer _stagingBuffer, uint32_t _bufferImageCopyCount, VkBufferImageCopy* _bufferImageCopy);
-		void setImageMemoryBarrier(VkCommandBuffer _commandBuffer, VkImageLayout _newImageLayout);
+		VkImageLayout setImageMemoryBarrier(VkCommandBuffer _commandBuffer, VkImageLayout _newImageLayout, bool _singleMsaaImage = false);
 
-		VkImageView createView(uint32_t _layer, uint32_t _numLayers, uint32_t _mip, uint32_t _numMips) const;
+		VkImageView createView(uint32_t _layer, uint32_t _numLayers, uint32_t _mip, uint32_t _numMips, VkImageViewType _type, bool _renderTarget) const;
 
 		void*    m_directAccessPtr;
 		uint64_t m_flags;
@@ -633,15 +649,85 @@ VK_DESTROY
 
 		VkImage        m_textureImage;
 		VkDeviceMemory m_textureDeviceMem;
-		VkImageView    m_textureImageView;
-		VkImageView    m_textureImageDepthView;
 		VkImageLayout  m_currentImageLayout;
 
 		VkImage        m_singleMsaaImage;
 		VkDeviceMemory m_singleMsaaDeviceMem;
-		VkImageView    m_singleMsaaImageView;
+		VkImageLayout  m_currentSingleMsaaImageLayout;
 
 		ReadbackVK m_readback;
+
+	private:
+		VkResult createImages(VkCommandBuffer _commandBuffer);
+	};
+
+	struct SwapChainVK
+	{
+		SwapChainVK()
+			: m_swapchain(VK_NULL_HANDLE)
+			, m_lastImageRenderedSemaphore(VK_NULL_HANDLE)
+			, m_lastImageAcquiredSemaphore(VK_NULL_HANDLE)
+			, m_backBufferColorMsaaImageView(VK_NULL_HANDLE)
+		{
+		}
+
+		VkResult create(uint32_t queueFamily, VkQueue _queue, VkCommandBuffer _commandBuffer, const Resolution& _resolution);
+		
+		void destroy();
+
+		void update(VkCommandBuffer _commandBuffer, uint32_t _width, uint32_t _height, uint32_t _reset);
+
+		VkResult createSurface(uint32_t _reset);
+		VkResult createSwapChain(uint32_t _reset);
+		VkResult createRenderPass();
+		VkResult createFrameBuffer();
+
+		void releaseSurface();
+		void releaseSwapChain();
+		void releaseRenderPass();
+		void releaseFrameBuffer();
+
+		void initImageLayout(VkCommandBuffer _commandBuffer);
+
+		uint32_t findPresentMode(bool _vsync);
+
+		bool acquire(VkCommandBuffer _commandBuffer);
+		void present();
+
+		VkQueue m_queue;
+		VkSwapchainCreateInfoKHR m_sci;
+
+		VkSurfaceKHR       m_surface;
+		VkSwapchainKHR     m_swapchain;
+		uint32_t           m_numSwapchainImages;
+		VkSurfaceFormatKHR m_backBufferColorFormat;
+		VkSurfaceFormatKHR m_backBufferColorFormatSrgb;
+		VkImageLayout      m_backBufferColorImageLayout[BGFX_CONFIG_MAX_BACK_BUFFERS];
+		VkImage            m_backBufferColorImage[BGFX_CONFIG_MAX_BACK_BUFFERS];
+		VkImageView        m_backBufferColorImageView[BGFX_CONFIG_MAX_BACK_BUFFERS];
+		VkFramebuffer      m_backBufferFrameBuffer[BGFX_CONFIG_MAX_BACK_BUFFERS];
+		VkFence            m_backBufferFence[BGFX_CONFIG_MAX_BACK_BUFFERS];
+		VkRenderPass       m_renderPass;
+
+		VkSemaphore m_presentDoneSemaphore[BGFX_CONFIG_MAX_BACK_BUFFERS];
+		VkSemaphore m_renderDoneSemaphore[BGFX_CONFIG_MAX_BACK_BUFFERS];
+		uint32_t    m_currentSemaphore;
+
+		VkSemaphore m_lastImageRenderedSemaphore;
+		VkSemaphore m_lastImageAcquiredSemaphore;
+
+		uint32_t m_backBufferColorIdx;
+		bool     m_needPresent;
+		bool     m_needToRefreshSwapchain;
+		bool     m_needToRecreateSurface;
+
+		VkFormat    m_backBufferDepthStencilFormat;
+		TextureVK   m_backBufferDepthStencil;
+		VkImageView m_backBufferDepthStencilImageView;
+
+		TextureVK     m_backBufferColorMsaa;
+		VkImageView   m_backBufferColorMsaaImageView;
+		MsaaSamplerVK m_sampler;
 	};
 
 	struct FrameBufferVK
@@ -719,6 +805,15 @@ VK_DESTROY
 
 		typedef stl::vector<Resource> ResourceArray;
 		ResourceArray m_release[BGFX_CONFIG_MAX_FRAME_LATENCY];
+
+	private:
+		template<typename Ty>
+		void destroy(uint64_t _handle)
+		{
+			typedef decltype(Ty::vk) vk_t;
+			Ty obj = vk_t(_handle);
+			vkDestroy(obj);
+		}
 	};
 
 } /* namespace bgfx */ } // namespace vk
