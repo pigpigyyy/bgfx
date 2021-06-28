@@ -83,7 +83,8 @@ Languages:
  * [Pascal language API bindings](https://github.com/Akira13641/PasBGFX)
  * [Python language API bindings #1](https://github.com/fbertola/bgfx-python#-----bgfx-python--)
  * [Python language API bindings #2](https://github.com/jnadro/pybgfx#pybgfx)
- * [Rust language API bindings](https://github.com/rhoot/bgfx-rs)
+ * [Rust language API bindings (obsolete)](https://github.com/rhoot/bgfx-rs)
+ * [Rust language API bindings (new)](https://github.com/emoon/bgfx-rs)
  * [Swift language API bindings](https://github.com/stuartcarnie/SwiftBGFX)
 
 Who is using it? [#madewithbgfx](https://twitter.com/search?q=%23madewithbgfx&f=live)
@@ -459,6 +460,15 @@ More than 850'000 peaks - from Mount Everest to the little hill around the corne
 https://www.peakfinder.org/
 
 ![PeakFinder](https://pfweb-c125.kxcdn.com/images/mobile/cards//en/cameramode.jpg)
+
+## Ember Sword
+
+Ember Sword is a free to play MMORPG running directly in your browser and is
+being developed and published by Bright Star Studios.
+
+https://embersword.com
+
+![Ember-Sword-ConceptArt5](https://user-images.githubusercontent.com/814772/120714133-a860ca80-c477-11eb-8680-f5a948dfd050.png)
 
 [License (BSD 2-clause)](https://bkaradzic.github.io/bgfx/license.html)
 -----------------------------------------------------------------------
