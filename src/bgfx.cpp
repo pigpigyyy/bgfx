@@ -2584,6 +2584,7 @@ namespace bgfx
 	}
 
 	BGFX_RENDERER_CONTEXT(noop);
+	BGFX_RENDERER_CONTEXT(agc);
 	BGFX_RENDERER_CONTEXT(d3d9);
 	BGFX_RENDERER_CONTEXT(d3d11);
 	BGFX_RENDERER_CONTEXT(d3d12);
@@ -2607,6 +2608,7 @@ namespace bgfx
 	static RendererCreator s_rendererCreator[] =
 	{
 		{ noop::rendererCreate,   noop::rendererDestroy,   BGFX_RENDERER_NOOP_NAME,       true                              }, // Noop
+		{ agc::rendererCreate,    agc::rendererDestroy,    BGFX_RENDERER_AGC_NAME,        !!BGFX_CONFIG_RENDERER_AGC        }, // GNM
 		{ d3d9::rendererCreate,   d3d9::rendererDestroy,   BGFX_RENDERER_DIRECT3D9_NAME,  !!BGFX_CONFIG_RENDERER_DIRECT3D9  }, // Direct3D9
 		{ d3d11::rendererCreate,  d3d11::rendererDestroy,  BGFX_RENDERER_DIRECT3D11_NAME, !!BGFX_CONFIG_RENDERER_DIRECT3D11 }, // Direct3D11
 		{ d3d12::rendererCreate,  d3d12::rendererDestroy,  BGFX_RENDERER_DIRECT3D12_NAME, !!BGFX_CONFIG_RENDERER_DIRECT3D12 }, // Direct3D12
@@ -4234,7 +4236,14 @@ namespace bgfx
 		BX_ASSERT(0 < _num, "Requesting 0 vertices.");
 		BX_ASSERT(isValid(_layout), "Invalid VertexLayout.");
 
-		s_ctx->allocTransientVertexBuffer(_tvb, _num, _layout);
+		VertexLayoutHandle layoutHandle;
+		{
+			BGFX_MUTEX_SCOPE(s_ctx->m_resourceApiLock);
+			layoutHandle = s_ctx->findOrCreateVertexLayout(_layout, true);
+		}
+		BX_ASSERT(isValid(layoutHandle), "Failed to allocate vertex layout handle (BGFX_CONFIG_MAX_VERTEX_LAYOUTS, max: %d).", BGFX_CONFIG_MAX_VERTEX_LAYOUTS);
+
+		s_ctx->allocTransientVertexBuffer(_tvb, _num, layoutHandle, _layout.m_stride);
 
 		BX_ASSERT(_num == _tvb->size / _layout.m_stride
 			, "Failed to allocate transient vertex buffer (requested %d, available %d). "

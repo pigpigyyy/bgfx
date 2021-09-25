@@ -2327,6 +2327,11 @@ VK_IMPORT_DEVICE
 		{
 			FrameBufferVK& frameBuffer = m_frameBuffers[_handle.idx];
 
+			if (_handle.idx == m_fbh.idx)
+			{
+				setFrameBuffer(BGFX_INVALID_HANDLE, false);
+			}
+
 			uint16_t denseIdx = frameBuffer.destroy();
 			if (UINT16_MAX != denseIdx)
 			{
@@ -2748,7 +2753,7 @@ VK_IMPORT_DEVICE
 			setShaderUniform(_flags, _regIndex, _val, _numRegs);
 		}
 
-		void setFrameBuffer(FrameBufferHandle _fbh)
+		void setFrameBuffer(FrameBufferHandle _fbh, bool _acquire = true)
 		{
 			BX_ASSERT(false
 				  ||  isValid(_fbh)
@@ -2815,15 +2820,19 @@ VK_IMPORT_DEVICE
 
 				newFrameBuffer.acquire(m_commandBuffer);
 			}
-			else
+
+			if (_acquire)
 			{
 				int64_t start = bx::getHPCounter();
 
 				newFrameBuffer.acquire(m_commandBuffer);
 
 				int64_t now = bx::getHPCounter();
-
-				m_presentElapsed += now - start;
+				
+				if (NULL != newFrameBuffer.m_nwh)
+				{
+					m_presentElapsed += now - start;
+				}
 			}
 
 			m_fbh = _fbh;
@@ -3969,6 +3978,7 @@ VK_IMPORT_DEVICE
 				if (_swapChain.m_colorFormat == TextureFormat::RGBA8)
 				{
 					bimg::imageSwizzleBgra8(src, pitch, width, height, src, pitch);
+					_func(src, width, height, pitch, _userData);
 				}
 				else if (_swapChain.m_colorFormat == TextureFormat::BGRA8)
 				{
@@ -4051,14 +4061,6 @@ VK_IMPORT_DEVICE
 					data = (const char*)m_uniforms[handle.idx];
 				}
 
-#define CASE_IMPLEMENT_UNIFORM(_uniform, _dxsuffix, _type)                   \
-				case UniformType::_uniform:                                  \
-				case UniformType::_uniform|kUniformFragmentBit:              \
-						{                                                    \
-							setShaderUniform(uint8_t(type), loc, data, num); \
-						}                                                    \
-						break;
-
 				switch ( (uint32_t)type)
 				{
 				case UniformType::Mat3:
@@ -4089,9 +4091,15 @@ VK_IMPORT_DEVICE
 				case UniformType::Sampler|kUniformFragmentBit:
 					// do nothing, but VkDescriptorSetImageInfo would be set before drawing
 					break;
-//				CASE_IMPLEMENT_UNIFORM(Sampler, I, int);
-				CASE_IMPLEMENT_UNIFORM(Vec4,    F, float);
-				CASE_IMPLEMENT_UNIFORM(Mat4,    F, float);
+
+				case UniformType::Vec4:
+				case UniformType::Vec4 | kUniformFragmentBit:
+				case UniformType::Mat4:
+				case UniformType::Mat4 | kUniformFragmentBit:
+					{
+						setShaderUniform(uint8_t(type), loc, data, num);
+					}
+					break;
 
 				case UniformType::End:
 					break;
@@ -4100,7 +4108,6 @@ VK_IMPORT_DEVICE
 					BX_TRACE("%4d: INVALID 0x%08x, t %d, l %d, n %d, c %d", _uniformBuffer.getPos(), opcode, type, loc, num, copy);
 					break;
 				}
-#undef CASE_IMPLEMENT_UNIFORM
 			}
 		}
 
@@ -6115,10 +6122,24 @@ VK_DESTROY
 		region.bufferImageHeight = 0;
 		region.imageSubresource.aspectMask     = m_aspectMask;
 		region.imageSubresource.mipLevel       = _mip;
-		region.imageSubresource.baseArrayLayer = _side;
+		region.imageSubresource.baseArrayLayer = 0;
 		region.imageSubresource.layerCount     = 1;
-		region.imageOffset = { _rect.m_x, _rect.m_y, _z };
+		region.imageOffset = { _rect.m_x, _rect.m_y, 0 };
 		region.imageExtent = { _rect.m_width, _rect.m_height, _depth };
+
+		if (VK_IMAGE_VIEW_TYPE_3D == m_type)
+		{
+			region.imageOffset.z = _z;
+		}
+		else if (VK_IMAGE_VIEW_TYPE_CUBE == m_type
+		||       VK_IMAGE_VIEW_TYPE_CUBE_ARRAY == m_type)
+		{
+			region.imageSubresource.baseArrayLayer = _z * 6 + _side;
+		}
+		else
+		{
+			region.imageSubresource.baseArrayLayer = _z;
+		}
 
 		copyBufferToTexture(_commandBuffer, stagingBuffer, 1, &region);
 
@@ -6136,6 +6157,7 @@ VK_DESTROY
 		const bool needResolve = VK_NULL_HANDLE != m_singleMsaaImage;
 
 		const bool needMipGen = true
+			&& !needResolve
 			&& 0 != (m_flags & BGFX_TEXTURE_RT_MASK)
 			&& 0 == (m_flags & BGFX_TEXTURE_RT_WRITE_ONLY)
 			&& (_mip + 1) < m_numMips
@@ -6179,23 +6201,12 @@ VK_DESTROY
 				);
 		}
 
-		if (needResolve && needMipGen)
-		{
-			setMemoryBarrier(
-				  _commandBuffer
-				, VK_PIPELINE_STAGE_TRANSFER_BIT
-				, VK_PIPELINE_STAGE_TRANSFER_BIT
-				);
-		}
-
 		if (needMipGen)
 		{
-			setImageMemoryBarrier(_commandBuffer, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, needResolve);
+			setImageMemoryBarrier(_commandBuffer, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
 			int32_t mipWidth  = bx::max<int32_t>(int32_t(m_width)  >> _mip, 1);
 			int32_t mipHeight = bx::max<int32_t>(int32_t(m_height) >> _mip, 1);
-
-			const VkImage image = needResolve ? m_singleMsaaImage : m_textureImage;
 
 			const VkFilter filter = bimg::isDepth(bimg::TextureFormat::Enum(m_textureFormat) )
 				? VK_FILTER_NEAREST
@@ -6229,7 +6240,7 @@ VK_DESTROY
 
 				vk::setImageMemoryBarrier(
 					  _commandBuffer
-					, image
+					, m_textureImage
 					, m_aspectMask
 					, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
 					, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL
@@ -6241,9 +6252,9 @@ VK_DESTROY
 
 				vkCmdBlitImage(
 					  _commandBuffer
-					, image
+					, m_textureImage
 					, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL
-					, image
+					, m_textureImage
 					, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
 					, 1
 					, &blit
@@ -6253,7 +6264,7 @@ VK_DESTROY
 
 			vk::setImageMemoryBarrier(
 				  _commandBuffer
-				, image
+				, m_textureImage
 				, m_aspectMask
 				, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL
 				, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
@@ -7303,6 +7314,7 @@ VK_DESTROY
 				BX_FALLTHROUGH;
 
 			case VK_ERROR_OUT_OF_DATE_KHR:
+			case VK_SUBOPTIMAL_KHR:
 				m_needToRefreshSwapchain = true;
 				return false;
 
