@@ -1886,6 +1886,11 @@ namespace bgfx
 			return 0 != (m_flags & BGFX_TEXTURE_READ_BACK);
 		}
 
+		bool isBlitDst() const
+		{
+			return 0 != (m_flags & BGFX_TEXTURE_BLIT_DST);
+		}
+
 		bool isCubeMap() const
 		{
 			return m_cubeMap;
@@ -2392,12 +2397,30 @@ namespace bgfx
 
 		void setState(uint64_t _state, uint32_t _rgba)
 		{
-			uint8_t blend = ( (_state&BGFX_STATE_BLEND_MASK)>>BGFX_STATE_BLEND_SHIFT)&0xff;
-			uint8_t alphaRef = ( (_state&BGFX_STATE_ALPHA_REF_MASK)>>BGFX_STATE_ALPHA_REF_SHIFT)&0xff;
-			// transparency sort order table
+			const uint8_t blend    = ( (_state&BGFX_STATE_BLEND_MASK    )>>BGFX_STATE_BLEND_SHIFT    )&0xff;
+			const uint8_t alphaRef = ( (_state&BGFX_STATE_ALPHA_REF_MASK)>>BGFX_STATE_ALPHA_REF_SHIFT)&0xff;
+
+			// Transparency sort order table:
+			//
+			//                    +----------------------------------------- BGFX_STATE_BLEND_ZERO
+			//                    |  +-------------------------------------- BGFX_STATE_BLEND_ONE
+			//                    |  |  +----------------------------------- BGFX_STATE_BLEND_SRC_COLOR
+			//                    |  |  |  +-------------------------------- BGFX_STATE_BLEND_INV_SRC_COLOR
+			//                    |  |  |  |  +----------------------------- BGFX_STATE_BLEND_SRC_ALPHA
+			//                    |  |  |  |  |  +-------------------------- BGFX_STATE_BLEND_INV_SRC_ALPHA
+			//                    |  |  |  |  |  |  +----------------------- BGFX_STATE_BLEND_DST_ALPHA
+			//                    |  |  |  |  |  |  |  +-------------------- BGFX_STATE_BLEND_INV_DST_ALPHA
+			//                    |  |  |  |  |  |  |  |  +----------------- BGFX_STATE_BLEND_DST_COLOR
+			//                    |  |  |  |  |  |  |  |  |  +-------------- BGFX_STATE_BLEND_INV_DST_COLOR
+			//                    |  |  |  |  |  |  |  |  |  |  +----------- BGFX_STATE_BLEND_SRC_ALPHA_SAT
+			//                    |  |  |  |  |  |  |  |  |  |  |  +-------- BGFX_STATE_BLEND_FACTOR
+			//                    |  |  |  |  |  |  |  |  |  |  |  |  +----- BGFX_STATE_BLEND_INV_FACTOR
+			//                    |  |  |  |  |  |  |  |  |  |  |  |  |
+			//                 x  |  |  |  |  |  |  |  |  |  |  |  |  |  x  x  x  x  x
 			m_key.m_blend = "\x0\x2\x2\x3\x3\x2\x3\x2\x3\x2\x2\x2\x2\x2\x2\x2\x2\x2\x2"[( (blend)&0xf) + (!!blend)] + !!alphaRef;
+
 			m_draw.m_stateFlags = _state;
-			m_draw.m_rgba = _rgba;
+			m_draw.m_rgba       = _rgba;
 		}
 
 		void setCondition(OcclusionQueryHandle _handle, bool _visible)

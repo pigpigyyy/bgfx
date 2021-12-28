@@ -279,17 +279,16 @@ EGL_IMPORT
 
 				EGLint flags = 0;
 
-				bx::ErrorIgnore errorIgnore{};
 #	if BX_PLATFORM_RPI
 				BX_UNUSED(hasEglKhrCreateContext, hasEglKhrNoError);
 #	else
 				if (hasEglKhrCreateContext)
 				{
-					bx::write(&writer, EGLint(EGL_CONTEXT_MAJOR_VERSION_KHR), errorIgnore);
-					bx::write(&writer, EGLint(gles / 10), errorIgnore);
+					bx::write(&writer, EGLint(EGL_CONTEXT_MAJOR_VERSION_KHR), bx::ErrorAssert{} );
+					bx::write(&writer, EGLint(gles / 10), bx::ErrorAssert{} );
 
-					bx::write(&writer, EGLint(EGL_CONTEXT_MINOR_VERSION_KHR), errorIgnore);
-					bx::write(&writer, EGLint(gles % 10), errorIgnore);
+					bx::write(&writer, EGLint(EGL_CONTEXT_MINOR_VERSION_KHR), bx::ErrorAssert{} );
+					bx::write(&writer, EGLint(gles % 10), bx::ErrorAssert{} );
 
 					flags |= BGFX_CONFIG_DEBUG && hasEglKhrNoError ? 0
 						| EGL_CONTEXT_FLAG_NO_ERROR_BIT_KHR
@@ -304,18 +303,18 @@ EGL_IMPORT
 							: 0
 							;
 
-						bx::write(&writer, EGLint(EGL_CONTEXT_FLAGS_KHR), errorIgnore);
-						bx::write(&writer, flags, errorIgnore);
+						bx::write(&writer, EGLint(EGL_CONTEXT_FLAGS_KHR), bx::ErrorAssert{} );
+						bx::write(&writer, flags, bx::ErrorAssert{});
 					}
 				}
 				else
 #	endif // BX_PLATFORM_RPI
 				{
-					bx::write(&writer, EGLint(EGL_CONTEXT_CLIENT_VERSION), errorIgnore);
-					bx::write(&writer, EGLint(gles / 10), errorIgnore);
+					bx::write(&writer, EGLint(EGL_CONTEXT_CLIENT_VERSION), bx::ErrorAssert{} );
+					bx::write(&writer, EGLint(gles / 10), bx::ErrorAssert{} );
 				}
 
-				bx::write(&writer, EGLint(EGL_NONE), errorIgnore);
+				bx::write(&writer, EGLint(EGL_NONE), bx::ErrorAssert{} );
 
 				m_context = eglCreateContext(m_display, m_config, EGL_NO_CONTEXT, s_contextAttrs);
 				if (NULL != m_context)

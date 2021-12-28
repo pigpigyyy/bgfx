@@ -2320,7 +2320,7 @@ VK_IMPORT_DEVICE
 
 			uint16_t denseIdx = m_numWindows++;
 			m_windows[denseIdx] = _handle;
-			m_frameBuffers[_handle.idx].create(denseIdx, _nwh, _width, _height, _format, _depthFormat);
+			VK_CHECK(m_frameBuffers[_handle.idx].create(denseIdx, _nwh, _width, _height, _format, _depthFormat) );
 		}
 
 		void destroyFrameBuffer(FrameBufferHandle _handle) override
@@ -6095,26 +6095,12 @@ VK_DESTROY
 		if (bimg::isCompressed(bimg::TextureFormat::Enum(m_textureFormat) ) )
 		{
 			const bimg::ImageBlockInfo& blockInfo = bimg::getBlockInfo(bimg::TextureFormat::Enum(m_textureFormat) );
-			rectpitch = (_rect.m_width / blockInfo.blockWidth) * blockInfo.blockSize;
+			rectpitch  = (_rect.m_width  / blockInfo.blockWidth ) * blockInfo.blockSize;
 			slicepitch = (_rect.m_height / blockInfo.blockHeight) * rectpitch;
 		}
 		const uint32_t srcpitch = UINT16_MAX == _pitch ? rectpitch : _pitch;
 		const uint32_t size     = UINT16_MAX == _pitch ? slicepitch  * _depth: _rect.m_height * _pitch * _depth;
 		const bool convert = m_textureFormat != m_requestedFormat;
-
-		uint8_t* data = _mem->data;
-		uint8_t* temp = NULL;
-
-		if (convert)
-		{
-			temp = (uint8_t*)BX_ALLOC(g_allocator, slicepitch);
-			bimg::imageDecodeToBgra8(g_allocator, temp, data, _rect.m_width, _rect.m_height, srcpitch, bimg::TextureFormat::Enum(m_requestedFormat) );
-			data = temp;
-		}
-
-		VkBuffer stagingBuffer = VK_NULL_HANDLE;
-		VkDeviceMemory stagingDeviceMem = VK_NULL_HANDLE;
-		VK_CHECK(s_renderVK->createStagingBuffer(size, &stagingBuffer, &stagingDeviceMem, data) );
 
 		VkBufferImageCopy region;
 		region.bufferOffset      = 0;
@@ -6124,8 +6110,29 @@ VK_DESTROY
 		region.imageSubresource.mipLevel       = _mip;
 		region.imageSubresource.baseArrayLayer = 0;
 		region.imageSubresource.layerCount     = 1;
-		region.imageOffset = { _rect.m_x, _rect.m_y, 0 };
+		region.imageOffset = { _rect.m_x,     _rect.m_y,      0      };
 		region.imageExtent = { _rect.m_width, _rect.m_height, _depth };
+
+		uint8_t* data = _mem->data;
+		uint8_t* temp = NULL;
+
+		if (convert)
+		{
+			temp = (uint8_t*)BX_ALLOC(g_allocator, slicepitch);
+			bimg::imageDecodeToBgra8(g_allocator, temp, data, _rect.m_width, _rect.m_height, srcpitch, bimg::TextureFormat::Enum(m_requestedFormat));
+			data = temp;
+
+			region.imageExtent =
+			{
+				bx::max(1u, m_width  >> _mip),
+				bx::max(1u, m_height >> _mip),
+				_depth,
+			};
+		}
+
+		VkBuffer stagingBuffer = VK_NULL_HANDLE;
+		VkDeviceMemory stagingDeviceMem = VK_NULL_HANDLE;
+		VK_CHECK(s_renderVK->createStagingBuffer(size, &stagingBuffer, &stagingDeviceMem, data) );
 
 		if (VK_IMAGE_VIEW_TYPE_3D == m_type)
 		{
@@ -7894,43 +7901,42 @@ VK_DESTROY
 
 	void RendererContextVK::submitBlit(BlitState& _bs, uint16_t _view)
 	{
-		TextureHandle currentSrc = { kInvalidHandle };
-		TextureHandle currentDst = { kInvalidHandle };
-		VkImageLayout oldSrcLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-		VkImageLayout oldDstLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		VkImageLayout srcLayouts[BGFX_CONFIG_MAX_BLIT_ITEMS];
+		VkImageLayout dstLayouts[BGFX_CONFIG_MAX_BLIT_ITEMS];
 
-		while (_bs.hasItem(_view) )
+		BlitState bs0 = _bs;
+
+		while (bs0.hasItem(_view) )
 		{
-			const BlitItem& blit = _bs.advance();
+			uint16_t item = bs0.m_item;
+
+			const BlitItem& blit = bs0.advance();
 
 			TextureVK& src = m_textures[blit.m_src.idx];
 			TextureVK& dst = m_textures[blit.m_dst.idx];
 
-			if (currentSrc.idx != blit.m_src.idx)
+			srcLayouts[item] = VK_NULL_HANDLE != src.m_singleMsaaImage ? src.m_currentSingleMsaaImageLayout : src.m_currentImageLayout;
+			dstLayouts[item] = dst.m_currentImageLayout;
+		}
+
+		bs0 = _bs;
+
+		while (bs0.hasItem(_view) )
+		{
+			const BlitItem& blit = bs0.advance();
+
+			TextureVK& src = m_textures[blit.m_src.idx];
+			TextureVK& dst = m_textures[blit.m_dst.idx];
+
+			src.setImageMemoryBarrier(
+				  m_commandBuffer
+				, blit.m_src.idx == blit.m_dst.idx ? VK_IMAGE_LAYOUT_GENERAL : VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL
+				, VK_NULL_HANDLE != src.m_singleMsaaImage
+				);
+
+			if (blit.m_src.idx != blit.m_dst.idx)
 			{
-				if (oldSrcLayout != VK_IMAGE_LAYOUT_UNDEFINED)
-				{
-					TextureVK& texture = m_textures[currentSrc.idx];
-					texture.setImageMemoryBarrier(m_commandBuffer, oldSrcLayout, VK_NULL_HANDLE != texture.m_singleMsaaImage);
-				}
-
-				oldSrcLayout = src.setImageMemoryBarrier(
-					  m_commandBuffer
-					, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL
-					, VK_NULL_HANDLE != src.m_singleMsaaImage
-					);
-				currentSrc = blit.m_src;
-			}
-
-			if (currentDst.idx != blit.m_dst.idx)
-			{
-				if (oldDstLayout != VK_IMAGE_LAYOUT_UNDEFINED)
-				{
-					m_textures[currentDst.idx].setImageMemoryBarrier(m_commandBuffer, oldDstLayout);
-				}
-
-				oldDstLayout = dst.setImageMemoryBarrier(m_commandBuffer, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-				currentDst = blit.m_dst;
+				dst.setImageMemoryBarrier(m_commandBuffer, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 			}
 
 			const uint16_t srcSamples = VK_NULL_HANDLE != src.m_singleMsaaImage ? 1 : src.m_sampler.Count;
@@ -7998,15 +8004,17 @@ VK_DESTROY
 				);
 		}
 
-		if (oldSrcLayout != VK_IMAGE_LAYOUT_UNDEFINED)
+		while (_bs.hasItem(_view) )
 		{
-			TextureVK& texture = m_textures[currentSrc.idx];
-			texture.setImageMemoryBarrier(m_commandBuffer, oldSrcLayout, VK_NULL_HANDLE != texture.m_singleMsaaImage);
-		}
+			uint16_t item = _bs.m_item;
 
-		if (oldDstLayout != VK_IMAGE_LAYOUT_UNDEFINED)
-		{
-			m_textures[currentDst.idx].setImageMemoryBarrier(m_commandBuffer, oldDstLayout);
+			const BlitItem& blit = _bs.advance();
+
+			TextureVK& src = m_textures[blit.m_src.idx];
+			TextureVK& dst = m_textures[blit.m_dst.idx];
+
+			src.setImageMemoryBarrier(m_commandBuffer, srcLayouts[item], VK_NULL_HANDLE != src.m_singleMsaaImage);
+			dst.setImageMemoryBarrier(m_commandBuffer, dstLayouts[item]);
 		}
 	}
 
