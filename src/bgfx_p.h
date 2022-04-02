@@ -1,6 +1,6 @@
 /*
- * Copyright 2011-2021 Branimir Karadzic. All rights reserved.
- * License: https://github.com/bkaradzic/bgfx#license-bsd-2-clause
+ * Copyright 2011-2022 Branimir Karadzic. All rights reserved.
+ * License: https://github.com/bkaradzic/bgfx/blob/master/LICENSE
  */
 
 #ifndef BGFX_P_H_HEADER_GUARD
@@ -10,7 +10,7 @@
 
 #ifndef BX_CONFIG_DEBUG
 #	error "BX_CONFIG_DEBUG must be defined in build script!"
-#endif // BGFX_CONFIG_DEBUG
+#endif // BX_CONFIG_DEBUG
 
 #define BGFX_CONFIG_DEBUG BX_CONFIG_DEBUG
 
@@ -19,8 +19,6 @@
 #	define BX_WARN   _BGFX_WARN
 #	define BX_ASSERT _BGFX_ASSERT
 #endif // BX_CONFIG_DEBUG
-
-#	define BX_ASSERT2 _BGFX_ASSERT
 
 #include <bgfx/bgfx.h>
 #include "config.h"

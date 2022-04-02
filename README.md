@@ -49,7 +49,6 @@ Supported rendering backends:
 Supported platforms:
 
  * Android (14+, ARM, x86, MIPS)
- * asm.js/Emscripten (1.25.0)
  * FreeBSD
  * iOS (iPhone, iPad, AppleTV)
  * Linux
@@ -57,8 +56,9 @@ Supported platforms:
  * OSX (10.12+)
  * PlayStation 4
  * RaspberryPi
- * Windows (XP, Vista, 7, 8, 10)
  * UWP (Universal Windows, Xbox One)
+ * Wasm/Emscripten
+ * Windows (XP, Vista, 7, 8, 10)
 
 Supported compilers:
 
@@ -488,6 +488,17 @@ https://www.guildwars2.com/
 
 ![Guild-Wars-2-wallpaper](https://d3b4yo2b5lbfy.cloudfront.net/wp-content/uploads/wallpapers/GuildWars2-01-800x600.jpg)
 
+## Griftlands
+
+Griftlands is a roguelike deck-building game with role-playing story elements in a science fiction setting, developed and published by Klei Entertainment.
+
+https://klei.com/games/griftlands
+
+<a href="http://www.youtube.com/watch?feature=player_embedded&v=ufl14_Ne5Lg" 
+target="_blank"><img src="http://img.youtube.com/vi/ufl14_Ne5Lg/0.jpg" 
+alt="Griftlands"
+width="640" height="480" border="0" /></a>
+
 [License (BSD 2-clause)](https://bkaradzic.github.io/bgfx/license.html)
 -----------------------------------------------------------------------
 
@@ -495,7 +506,7 @@ https://www.guildwars2.com/
 <img align="right" src="http://opensource.org/trademarks/opensource/OSI-Approved-License-100x137.png">
 </a>
 
-	Copyright 2010-2021 Branimir Karadzic
+	Copyright 2010-2022 Branimir Karadzic
 	
 	Redistribution and use in source and binary forms, with or without modification,
 	are permitted provided that the following conditions are met:

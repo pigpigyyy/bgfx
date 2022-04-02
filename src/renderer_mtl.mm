@@ -1,6 +1,6 @@
 /*
  * Copyright 2011-2016 Attila Kocsis. All rights reserved.
- * License: https://github.com/bkaradzic/bgfx#license-bsd-2-clause
+ * License: https://github.com/bkaradzic/bgfx/blob/master/LICENSE
  */
 
 #include "bgfx_p.h"
@@ -2145,6 +2145,10 @@ namespace bgfx { namespace mtl
 					{
 						const TextureMtl& texture = m_textures[frameBuffer.m_depthHandle.idx];
 						pd.depthAttachmentPixelFormat = texture.m_ptr.m_obj.pixelFormat;
+						pd.sampleCount = NULL != texture.m_ptrMsaa
+							? texture.m_ptrMsaa.sampleCount()
+							: 1
+							;
 						if (NULL != texture.m_ptrStencil)
 						{
 							pd.stencilAttachmentPixelFormat = texture.m_ptrStencil.m_obj.pixelFormat;
@@ -2916,7 +2920,7 @@ namespace bgfx { namespace mtl
 				temp = (uint8_t*)BX_ALLOC(g_allocator, ti.width*ti.height*4);
 			}
 
-			for (uint8_t side = 0; side < numSides; ++side)
+			for (uint16_t side = 0; side < numSides; ++side)
 			{
 				uint32_t width  = ti.width;
 				uint32_t height = ti.height;

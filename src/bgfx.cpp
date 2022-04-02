@@ -1,6 +1,6 @@
 /*
- * Copyright 2011-2021 Branimir Karadzic. All rights reserved.
- * License: https://github.com/bkaradzic/bgfx#license-bsd-2-clause
+ * Copyright 2011-2022 Branimir Karadzic. All rights reserved.
+ * License: https://github.com/bkaradzic/bgfx/blob/master/LICENSE
  */
 
 #include <bx/platform.h>
@@ -1263,13 +1263,13 @@ namespace bgfx
 
 		m_key.m_view = _id;
 
-		SortKey::Enum type = SortKey::SortProgram;
+		SortKey::Enum type;
 		switch (s_ctx->m_view[_id].m_mode)
 		{
 		case ViewMode::Sequential:      m_key.m_seq   = s_ctx->getSeqIncr(_id); type = SortKey::SortSequence; break;
 		case ViewMode::DepthAscending:  m_key.m_depth =            _depth;      type = SortKey::SortDepth;    break;
 		case ViewMode::DepthDescending: m_key.m_depth = UINT32_MAX-_depth;      type = SortKey::SortDepth;    break;
-		default: break;
+		default:                        m_key.m_depth =            _depth;      type = SortKey::SortProgram;  break;
 		}
 
 		uint64_t key = m_key.encodeDraw(type);
@@ -4580,8 +4580,8 @@ namespace bgfx
 			);
 
 		BGFX_ERROR_CHECK(false
-			|| _width  < g_caps.limits.maxTextureSize
-			|| _height < g_caps.limits.maxTextureSize
+			|| _width  <= g_caps.limits.maxTextureSize
+			|| _height <= g_caps.limits.maxTextureSize
 			, _err
 			, BGFX_ERROR_TEXTURE_VALIDATION
 			, "Requested texture width/height is above the `maxTextureSize` limit."

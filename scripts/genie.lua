@@ -1,6 +1,6 @@
 --
--- Copyright 2010-2021 Branimir Karadzic. All rights reserved.
--- License: https://github.com/bkaradzic/bgfx#license-bsd-2-clause
+-- Copyright 2010-2022 Branimir Karadzic. All rights reserved.
+-- License: https://github.com/bkaradzic/bgfx/blob/master/LICENSE
 --
 
 MODULE_DIR = path.getabsolute("../")
@@ -97,14 +97,19 @@ newaction {
 
 		local f = io.popen("git rev-list --count HEAD")
 		local rev = string.match(f:read("*a"), ".*%S")
+
+		local codegen = require "codegen"
+		local idl = codegen.idl "bgfx.idl"
+		print("1." .. idl._version .. "." .. rev)
+
 		f:close()
 		f = io.popen("git log --format=format:%H -1")
 		local sha1 = f:read("*a")
 		f:close()
 		io.output(path.join(MODULE_DIR, "src/version.h"))
 		io.write("/*\n")
-		io.write(" * Copyright 2011-2021 Branimir Karadzic. All rights reserved.\n")
-		io.write(" * License: https://github.com/bkaradzic/bgfx#license-bsd-2-clause\n")
+		io.write(" * Copyright 2011-2022 Branimir Karadzic. All rights reserved.\n")
+		io.write(" * License: https://github.com/bkaradzic/bgfx/blob/master/LICENSE\n")
 		io.write(" */\n")
 		io.write("\n")
 		io.write("/*\n")
@@ -203,7 +208,7 @@ end
 if _OPTIONS["with-sdl"] then
 	if os.is("windows") then
 		if not os.getenv("SDL2_DIR") then
-			print("Set SDL2_DIR enviroment variable.")
+			print("Set SDL2_DIR environment variable.")
 		end
 	end
 end
