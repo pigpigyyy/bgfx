@@ -1887,6 +1887,11 @@ namespace bgfx
 		m_init.resolution.maxFrameLatency = bx::min<uint8_t>(_init.resolution.maxFrameLatency, BGFX_CONFIG_MAX_FRAME_LATENCY);
 		dump(m_init.resolution);
 
+		if (g_platformDataChangedSinceReset) {
+			bx::memCopy(&m_init.platformData, &g_platformData, sizeof(PlatformData) );
+			g_platformDataChangedSinceReset = false;
+		}
+
 		if (true
 		&&  RendererType::Noop != m_init.type
 		&&  NULL == m_init.platformData.ndt
