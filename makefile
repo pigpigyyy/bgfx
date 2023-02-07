@@ -65,7 +65,7 @@ idl: ## Generate code from IDL.
 	cd scripts && ../$(GENIE) idl
 
 .build/projects/gmake-android-arm:
-	$(GENIE) --gcc=android-arm --with-combined-examples --with-shared-lib gmake
+	$(GENIE) --gcc=android-arm gmake
 android-arm-debug: .build/projects/gmake-android-arm ## Build - Android ARM Debug
 	$(MAKE) -R -C .build/projects/gmake-android-arm config=debug
 android-arm-release: .build/projects/gmake-android-arm ## Build - Android ARM Release
@@ -73,7 +73,7 @@ android-arm-release: .build/projects/gmake-android-arm ## Build - Android ARM Re
 android-arm: android-arm-debug android-arm-release ## Build - Android ARM Debug and Release
 
 .build/projects/gmake-android-arm64:
-	$(GENIE) --gcc=android-arm64 --with-combined-examples --with-shared-lib gmake
+	$(GENIE) --gcc=android-arm64 gmake
 android-arm64-debug: .build/projects/gmake-android-arm64 ## Build - Android ARM64 Debug
 	$(MAKE) -R -C .build/projects/gmake-android-arm64 config=debug
 android-arm64-release: .build/projects/gmake-android-arm64 ## Build - Android ARM64 Release
@@ -81,7 +81,7 @@ android-arm64-release: .build/projects/gmake-android-arm64 ## Build - Android AR
 android-arm64: android-arm64-debug android-arm64-release ## Build - Android ARM64 Debug and Release
 
 .build/projects/gmake-android-x86:
-	$(GENIE) --gcc=android-x86 --with-combined-examples --with-shared-lib gmake
+	$(GENIE) --gcc=android-x86 gmake
 android-x86-debug: .build/projects/gmake-android-x86 ## Build - Android x86 Debug and Release
 	$(MAKE) -R -C .build/projects/gmake-android-x86 config=debug
 android-x86-release: .build/projects/gmake-android-x86 ## Build - Android x86 Debug and Release
