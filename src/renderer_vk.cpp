@@ -17,6 +17,10 @@
 #	import <Metal/Metal.h>
 #endif // BX_PLATFORM_OSX
 
+#if WL_EGL_PLATFORM
+#	include <wayland-egl-backend.h>
+#endif
+
 namespace bgfx { namespace vk
 {
 	static char s_viewName[BGFX_CONFIG_MAX_VIEWS][BGFX_CONFIG_MAX_VIEW_NAME];
@@ -1416,6 +1420,7 @@ VK_IMPORT_INSTANCE
 				{
 					VkPhysicalDeviceProperties pdp;
 					vkGetPhysicalDeviceProperties(physicalDevices[ii], &pdp);
+
 					BX_TRACE("Physical device %d:", ii);
 					BX_TRACE("\t          Name: %s", pdp.deviceName);
 					BX_TRACE("\t   API version: %d.%d.%d"
@@ -1429,13 +1434,18 @@ VK_IMPORT_INSTANCE
 					BX_TRACE("\t      DeviceId: %x", pdp.deviceID);
 					BX_TRACE("\t          Type: %d", pdp.deviceType);
 
+					if (VK_PHYSICAL_DEVICE_TYPE_CPU == pdp.deviceType)
+					{
+						pdp.vendorID = BGFX_PCI_ID_SOFTWARE_RASTERIZER;
+					}
+
 					g_caps.gpu[ii].vendorId = uint16_t(pdp.vendorID);
 					g_caps.gpu[ii].deviceId = uint16_t(pdp.deviceID);
 					++g_caps.numGPUs;
 
 					if ( (BGFX_PCI_ID_NONE != g_caps.vendorId ||            0 != g_caps.deviceId)
 					&&   (BGFX_PCI_ID_NONE == g_caps.vendorId || pdp.vendorID == g_caps.vendorId)
-					&&   (0 == g_caps.deviceId                || pdp.deviceID == g_caps.deviceId) )
+					&&   (               0 == g_caps.deviceId || pdp.deviceID == g_caps.deviceId) )
 					{
 						if (pdp.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU
 						||  pdp.deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU)
@@ -1445,7 +1455,7 @@ VK_IMPORT_INSTANCE
 
 						physicalDeviceIdx = ii;
 					}
-					else
+					else if (UINT32_MAX == physicalDeviceIdx)
 					{
 						if (pdp.deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU)
 						{
@@ -1560,6 +1570,7 @@ VK_IMPORT_INSTANCE
 				m_deviceFeatures.shaderClipDistance   = supportedFeatures.shaderClipDistance;
 				m_deviceFeatures.shaderCullDistance   = supportedFeatures.shaderCullDistance;
 				m_deviceFeatures.shaderResourceMinLod = supportedFeatures.shaderResourceMinLod;
+				m_deviceFeatures.geometryShader = supportedFeatures.geometryShader;
 
 				m_lineAASupport = true
 					&& s_extension[Extension::EXT_line_rasterization].m_supported
@@ -1598,6 +1609,7 @@ VK_IMPORT_INSTANCE
 					| BGFX_CAPS_VERTEX_ATTRIB_HALF
 					| BGFX_CAPS_VERTEX_ATTRIB_UINT10
 					| BGFX_CAPS_VERTEX_ID
+					| (m_deviceFeatures.geometryShader ? BGFX_CAPS_PRIMITIVE_ID : 0)
 					);
 
 				g_caps.supported |= 0
@@ -6768,6 +6780,20 @@ VK_DESTROY
 			}
 		}
 #elif BX_PLATFORM_LINUX
+#if     WL_EGL_PLATFORM
+		{
+			if (NULL != vkCreateWaylandSurfaceKHR)
+			{
+				VkWaylandSurfaceCreateInfoKHR sci;
+				sci.sType = VK_STRUCTURE_TYPE_WAYLAND_SURFACE_CREATE_INFO_KHR;
+				sci.pNext = NULL;
+				sci.flags = 0;
+				sci.display = (wl_display*)g_platformData.ndt;
+				sci.surface = (wl_surface*)((wl_egl_window*)g_platformData.nwh)->surface;
+				result = vkCreateWaylandSurfaceKHR(instance, &sci, allocatorCb, &m_surface);
+			}
+		}
+#else
 		{
 			if (NULL != vkCreateXlibSurfaceKHR)
 			{
@@ -6804,6 +6830,7 @@ VK_DESTROY
 				}
 			}
 		}
+#endif // WL_EGL_PLATFORM
 #elif BX_PLATFORM_OSX
 		{
 			if (NULL != vkCreateMacOSSurfaceMVK)

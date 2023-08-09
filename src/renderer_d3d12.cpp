@@ -1357,6 +1357,7 @@ namespace bgfx { namespace d3d12
 					| BGFX_CAPS_IMAGE_RW
 					| BGFX_CAPS_VIEWPORT_LAYER_ARRAY
 					| BGFX_CAPS_DRAW_INDIRECT_COUNT
+					| BGFX_CAPS_PRIMITIVE_ID
 					);
 				g_caps.limits.maxTextureSize     = D3D12_REQ_TEXTURE2D_U_OR_V_DIMENSION;
 				g_caps.limits.maxTextureLayers   = D3D12_REQ_TEXTURE2D_ARRAY_AXIS_DIMENSION;
@@ -3438,7 +3439,7 @@ namespace bgfx { namespace d3d12
 			if (isValid(m_fbh) )
 			{
 				FrameBufferD3D12& frameBuffer = m_frameBuffers[m_fbh.idx];
-				frameBuffer.clear(m_commandList, _clear, _palette);
+				frameBuffer.clear(m_commandList, _clear, _palette, _rect, _num);
 			}
 			else
 			{
