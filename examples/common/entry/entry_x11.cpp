@@ -5,7 +5,7 @@
 
 #include "entry_p.h"
 
-#if ENTRY_CONFIG_USE_NATIVE && (BX_PLATFORM_BSD || BX_PLATFORM_LINUX || BX_PLATFORM_RPI)
+#if ENTRY_CONFIG_USE_NATIVE && (BX_PLATFORM_LINUX || BX_PLATFORM_RPI)
 
 #define XK_MISCELLANY
 #define XK_LATIN1
@@ -771,6 +771,11 @@ namespace entry
 		return s_ctx.m_display;
 	}
 
+	bgfx::NativeWindowHandleType::Enum getNativeWindowHandleType()
+	{
+		return bgfx::NativeWindowHandleType::Default;
+	}
+
 } // namespace entry
 
 int main(int _argc, const char* const* _argv)
@@ -779,4 +784,4 @@ int main(int _argc, const char* const* _argv)
 	return s_ctx.run(_argc, _argv);
 }
 
-#endif // ENTRY_CONFIG_USE_NATIVE && (BX_PLATFORM_BSD || BX_PLATFORM_LINUX || BX_PLATFORM_RPI)
+#endif // ENTRY_CONFIG_USE_NATIVE && (BX_PLATFORM_LINUX || BX_PLATFORM_RPI)

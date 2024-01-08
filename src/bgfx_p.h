@@ -92,13 +92,13 @@ namespace bgfx
 		}                                             \
 	BX_MACRO_BLOCK_END
 
-#define _BGFX_ASSERT(_condition, _format, ...)                                                          \
-	BX_MACRO_BLOCK_BEGIN                                                                                \
-		if (!BX_IGNORE_C4127(_condition) )                                                              \
-		{                                                                                               \
-			BX_TRACE("ASSERT " _format, ##__VA_ARGS__);                                                 \
-			bgfx::fatal(__FILE__, uint16_t(__LINE__), bgfx::Fatal::DebugCheck, _format, ##__VA_ARGS__); \
-		}                                                                                               \
+#define _BGFX_ASSERT(_condition, _format, ...)                                                                 \
+	BX_MACRO_BLOCK_BEGIN                                                                                       \
+		if (!BX_IGNORE_C4127(_condition)                                                                       \
+		&&  bx::assertFunction(bx::Location::current(), "ASSERT " #_condition " -> " _format, ##__VA_ARGS__) ) \
+		{                                                                                                      \
+			bgfx::fatal(__FILE__, uint16_t(__LINE__), bgfx::Fatal::DebugCheck, _format, ##__VA_ARGS__);        \
+		}                                                                                                      \
 	BX_MACRO_BLOCK_END
 
 #define BGFX_FATAL(_condition, _err, _format, ...)                             \
@@ -236,14 +236,12 @@ namespace stl = std;
 
 #define BGFX_RENDERER_NOOP_NAME       "Noop"
 #define BGFX_RENDERER_AGC_NAME        "AGC"
-#define BGFX_RENDERER_DIRECT3D9_NAME  "Direct3D 9"
 #define BGFX_RENDERER_DIRECT3D11_NAME "Direct3D 11"
 #define BGFX_RENDERER_DIRECT3D12_NAME "Direct3D 12"
 #define BGFX_RENDERER_GNM_NAME        "GNM"
 #define BGFX_RENDERER_METAL_NAME      "Metal"
 #define BGFX_RENDERER_NVN_NAME        "NVN"
 #define BGFX_RENDERER_VULKAN_NAME     "Vulkan"
-#define BGFX_RENDERER_WEBGPU_NAME     "WebGPU"
 
 #if BGFX_CONFIG_RENDERER_OPENGL
 #	if BGFX_CONFIG_RENDERER_OPENGL >= 31 && BGFX_CONFIG_RENDERER_OPENGL <= 33
@@ -429,7 +427,7 @@ namespace bgfx
 		};
 	};
 
-	bool windowsVersionIs(Condition::Enum _op, uint32_t _version);
+	bool windowsVersionIs(Condition::Enum _op, uint32_t _version, uint32_t _build = UINT32_MAX);
 
 	constexpr bool isShaderType(uint32_t _magic, char _type)
 	{
@@ -637,7 +635,7 @@ namespace bgfx
 		if (_hasMips)
 		{
 			const uint32_t max = bx::max(_width, _height, _depth);
-			const uint32_t num = 1 + uint32_t(bx::log2<int32_t>(max) );
+			const uint32_t num = 1 + bx::floorLog2(max);
 
 			return uint8_t(num);
 		}

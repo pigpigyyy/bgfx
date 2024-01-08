@@ -1375,11 +1375,6 @@ public static class bgfx
 		Agc,
 	
 		/// <summary>
-		/// Direct3D 9.0
-		/// </summary>
-		Direct3D9,
-	
-		/// <summary>
 		/// Direct3D 11.0
 		/// </summary>
 		Direct3D11,
@@ -1418,11 +1413,6 @@ public static class bgfx
 		/// Vulkan
 		/// </summary>
 		Vulkan,
-	
-		/// <summary>
-		/// WebGPU
-		/// </summary>
-		WebGPU,
 	
 		Count
 	}
@@ -2017,6 +2007,22 @@ public static class bgfx
 	}
 	
 	[AllowDuplicates]
+	public enum NativeWindowHandleType : uint32
+	{
+		/// <summary>
+		/// Platform default handle type (X11 on Linux).
+		/// </summary>
+		Default,
+	
+		/// <summary>
+		/// Wayland.
+		/// </summary>
+		Wayland,
+	
+		Count
+	}
+	
+	[AllowDuplicates]
 	public enum RenderFrame : uint32
 	{
 		/// <summary>
@@ -2108,6 +2114,7 @@ public static class bgfx
 		public void* context;
 		public void* backBuffer;
 		public void* backBufferDS;
+		public NativeWindowHandleType type;
 	}
 	
 	[CRepr]
@@ -2998,6 +3005,8 @@ public static class bgfx
 	
 	/// <summary>
 	/// Create shader from memory buffer.
+	/// @remarks
+	///   Shader binary is obtained by compiling shader offline with shaderc command line tool.
 	/// </summary>
 	///
 	/// <param name="_mem">Shader binary.</param>

@@ -161,6 +161,11 @@ namespace entry
 		return NULL;
 	}
 
+	bgfx::NativeWindowHandleType::Enum getNativeWindowHandleType()
+	{
+		return bgfx::NativeWindowHandleType::Default;
+	}
+
 } // namespace entry
 
 using namespace entry;

@@ -1979,7 +1979,7 @@ namespace bgfx { namespace gl
 				{
 					return true;
 				}
-				BX_FALLTHROUGH;
+				[[fallthrough]];
 
 			case TextureFormat::RGBA32F:
 				if (_writeOnly)
@@ -2910,7 +2910,7 @@ namespace bgfx { namespace gl
 					: 0
 					;
 
-				g_caps.limits.maxTextureSize     = uint16_t(glGet(GL_MAX_TEXTURE_SIZE) );
+				g_caps.limits.maxTextureSize     = uint32_t(glGet(GL_MAX_TEXTURE_SIZE) );
 				g_caps.limits.maxTextureLayers   = BX_ENABLED(BGFX_CONFIG_RENDERER_OPENGL >= 30) || BX_ENABLED(BGFX_CONFIG_RENDERER_OPENGLES >= 30) || s_extension[Extension::EXT_texture_array].m_supported ? uint16_t(bx::max(glGet(GL_MAX_ARRAY_TEXTURE_LAYERS), 1) ) : 1;
 				g_caps.limits.maxComputeBindings = computeSupport ? BGFX_MAX_COMPUTE_BINDINGS : 0;
 				g_caps.limits.maxVertexStreams   = BGFX_CONFIG_MAX_VERTEX_STREAMS;
@@ -6835,9 +6835,22 @@ namespace bgfx { namespace gl
 				char* temp = (char*)alloca(tempLen);
 				bx::StaticMemoryBlockWriter writer(temp, tempLen);
 
+				int32_t verLen = 0;
+				if (s_renderGL->m_gles3)
+				{
+					const char* str = "#version 310 es\n";
+					verLen = bx::strLen(str);
+					bx::write(&writer, &err, str);
+				}
+				else
+				{
+					const char* str = "#version 430\n";
+					verLen = bx::strLen(str);
+					bx::write(&writer, &err, str);
+				}
+
 				bx::write(&writer
-					, "#version 430\n"
-					  "#define texture2DLod             textureLod\n"
+					, "#define texture2DLod             textureLod\n"
 					  "#define texture2DLodOffset       textureLodOffset\n"
 					  "#define texture2DArrayLod        textureLod\n"
 					  "#define texture2DArrayLodOffset  textureLodOffset\n"
@@ -6849,7 +6862,6 @@ namespace bgfx { namespace gl
 					, &err
 					);
 
-				int32_t verLen = bx::strLen("#version 430\n");
 				bx::write(&writer, code.getPtr()+verLen, codeLen-verLen, &err);
 				bx::write(&writer, '\0', &err);
 

@@ -840,9 +840,6 @@ pub const RendererType = enum(c_int) {
     /// AGC
     Agc,
 
-    /// Direct3D 9.0
-    Direct3D9,
-
     /// Direct3D 11.0
     Direct3D11,
 
@@ -866,9 +863,6 @@ pub const RendererType = enum(c_int) {
 
     /// Vulkan
     Vulkan,
-
-    /// WebGPU
-    WebGPU,
 
     Count
 };
@@ -1260,6 +1254,16 @@ pub const ViewMode = enum(c_int) {
     Count
 };
 
+pub const NativeWindowHandleType = enum(c_int) {
+    /// Platform default handle type (X11 on Linux).
+    Default,
+
+    /// Wayland.
+    Wayland,
+
+    Count
+};
+
 pub const RenderFrame = enum(c_int) {
     /// Renderer context is not created yet.
     NoContext,
@@ -1332,6 +1336,7 @@ pub const Caps = extern struct {
         context: ?*anyopaque,
         backBuffer: ?*anyopaque,
         backBufferDS: ?*anyopaque,
+        type: NativeWindowHandleType,
     };
 
     pub const Resolution = extern struct {
@@ -2396,6 +2401,8 @@ pub inline fn destroyIndirectBuffer(_handle: IndirectBufferHandle) void {
 extern fn bgfx_destroy_indirect_buffer(_handle: IndirectBufferHandle) void;
 
 /// Create shader from memory buffer.
+/// @remarks
+///   Shader binary is obtained by compiling shader offline with shaderc command line tool.
 /// <param name="_mem">Shader binary.</param>
 pub inline fn createShader(_mem: [*c]const Memory) ShaderHandle {
     return bgfx_create_shader(_mem);

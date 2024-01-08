@@ -17,9 +17,9 @@
 #	import <Metal/Metal.h>
 #endif // BX_PLATFORM_OSX
 
-#if WL_EGL_PLATFORM
+#if defined(WL_EGL_PLATFORM)
 #	include <wayland-egl-backend.h>
-#endif
+#endif // defined(WL_EGL_PLATFORM)
 
 namespace bgfx { namespace vk
 {
@@ -287,8 +287,8 @@ VK_IMPORT_DEVICE
 	{
 		enum Enum
 		{
-			VK_LAYER_LUNARG_standard_validation,
 			VK_LAYER_KHRONOS_validation,
+			VK_LAYER_LUNARG_standard_validation,
 
 			Count
 		};
@@ -303,8 +303,8 @@ VK_IMPORT_DEVICE
 	//
 	static Layer s_layer[] =
 	{
-		{ "VK_LAYER_LUNARG_standard_validation", 1, { false, false }, { false, false } },
 		{ "VK_LAYER_KHRONOS_validation",         1, { false, false }, { false, false } },
+		{ "VK_LAYER_LUNARG_standard_validation", 1, { false, false }, { false, false } },
 		{ "",                                    0, { false, false }, { false, false } },
 	};
 	BX_STATIC_ASSERT(Layer::Count == BX_COUNTOF(s_layer)-1);
@@ -337,15 +337,15 @@ VK_IMPORT_DEVICE
 	{
 		enum Enum
 		{
-			EXT_debug_utils,
-			EXT_debug_report,
-			EXT_memory_budget,
-			KHR_get_physical_device_properties2,
 			EXT_conservative_rasterization,
-			EXT_line_rasterization,
-			EXT_shader_viewport_index_layer,
 			EXT_custom_border_color,
+			EXT_debug_report,
+			EXT_debug_utils,
+			EXT_line_rasterization,
+			EXT_memory_budget,
+			EXT_shader_viewport_index_layer,
 			KHR_draw_indirect_count,
+			KHR_get_physical_device_properties2,
 
 			Count
 		};
@@ -362,15 +362,15 @@ VK_IMPORT_DEVICE
 	//
 	static Extension s_extension[] =
 	{
+		{ "VK_EXT_conservative_rasterization",      1, false, false, true,                                                          Layer::Count },
+		{ "VK_EXT_custom_border_color",             1, false, false, true,                                                          Layer::Count },
+		{ "VK_EXT_debug_report",                    1, false, false, false,                                                         Layer::Count },
 		{ "VK_EXT_debug_utils",                     1, false, false, BGFX_CONFIG_DEBUG_OBJECT_NAME || BGFX_CONFIG_DEBUG_ANNOTATION, Layer::Count },
-		{ "VK_EXT_debug_report",                    1, false, false, false                                                        , Layer::Count },
-		{ "VK_EXT_memory_budget",                   1, false, false, true                                                         , Layer::Count },
-		{ "VK_KHR_get_physical_device_properties2", 1, false, false, true                                                         , Layer::Count },
-		{ "VK_EXT_conservative_rasterization",      1, false, false, true                                                         , Layer::Count },
-		{ "VK_EXT_line_rasterization",              1, false, false, true                                                         , Layer::Count },
-		{ "VK_EXT_shader_viewport_index_layer",     1, false, false, true                                                         , Layer::Count },
-		{ "VK_EXT_custom_border_color",             1, false, false, true                                                         , Layer::Count },
-		{ "VK_KHR_draw_indirect_count",             1, false, false, true                                                         , Layer::Count },
+		{ "VK_EXT_line_rasterization",              1, false, false, true,                                                          Layer::Count },
+		{ "VK_EXT_memory_budget",                   1, false, false, true,                                                          Layer::Count },
+		{ "VK_EXT_shader_viewport_index_layer",     1, false, false, true,                                                          Layer::Count },
+		{ "VK_KHR_draw_indirect_count",             1, false, false, true,                                                          Layer::Count },
+		{ "VK_KHR_get_physical_device_properties2", 1, false, false, true,                                                          Layer::Count },
 	};
 	BX_STATIC_ASSERT(Extension::Count == BX_COUNTOF(s_extension) );
 
@@ -1161,7 +1161,7 @@ VK_IMPORT_DEVICE
 #elif BX_PLATFORM_ANDROID
 				"libvulkan.so"
 #elif BX_PLATFORM_OSX
-				"libvulkan.dylib"
+				"libMoltenVK.dylib"
 #else
 				"libvulkan.so.1"
 #endif // BX_PLATFORM_*
@@ -1214,7 +1214,6 @@ VK_IMPORT
 				}
 
 				uint32_t numEnabledLayers = 0;
-
 				const char* enabledLayer[Layer::Count];
 
 				BX_TRACE("Enabled instance layers:");
@@ -1230,22 +1229,15 @@ VK_IMPORT
 						BX_TRACE("\t%s", layer.m_name);
 					}
 				}
-#if BX_PLATFORM_OSX
-				uint32_t numEnabledExtensions = headless ? 0 : 3;
 
-				const char* enabledExtension[Extension::Count + 3] =
-#else
-				uint32_t numEnabledExtensions = headless ? 0 : 2;
+				uint32_t numEnabledExtensions = 0;
+				const char* enabledExtension[Extension::Count + 2];
 
-				const char* enabledExtension[Extension::Count + 2] =
-#endif
+				if (!headless)
 				{
-					VK_KHR_SURFACE_EXTENSION_NAME,
-					KHR_SURFACE_EXTENSION_NAME,
-#if BX_PLATFORM_OSX
-					VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME,
-#endif
-				};
+					enabledExtension[numEnabledExtensions++] = VK_KHR_SURFACE_EXTENSION_NAME;
+					enabledExtension[numEnabledExtensions++] = KHR_SURFACE_EXTENSION_NAME;
+				}
 
 				for (uint32_t ii = 0; ii < Extension::Count; ++ii)
 				{
@@ -1253,8 +1245,7 @@ VK_IMPORT
 					const LayerInfo& layerInfo = s_layer[extension.m_layer].m_instance;
 
 					const bool layerEnabled = false
-						|| extension.m_layer == Layer::Count
-						|| (layerInfo.m_supported && layerInfo.m_initialize)
+						|| extension.m_layer == Layer::Count  || (layerInfo.m_supported && layerInfo.m_initialize)
 						;
 
 					if (extension.m_supported
@@ -1306,11 +1297,9 @@ VK_IMPORT
 				VkInstanceCreateInfo ici;
 				ici.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
 				ici.pNext = NULL;
-#if BX_PLATFORM_OSX
-				ici.flags = 0 | VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
-#else
-				ici.flags = 0;
-#endif
+				ici.flags = 0
+					| (BX_ENABLED(BX_PLATFORM_OSX) ? VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR : 0)
+					;
 				ici.pApplicationInfo        = &appInfo;
 				ici.enabledLayerCount       = numEnabledLayers;
 				ici.ppEnabledLayerNames     = enabledLayer;
@@ -1552,25 +1541,25 @@ VK_IMPORT_INSTANCE
 
 				bx::memSet(&m_deviceFeatures, 0, sizeof(m_deviceFeatures) );
 
-				m_deviceFeatures.fullDrawIndexUint32       = supportedFeatures.fullDrawIndexUint32;
-				m_deviceFeatures.imageCubeArray            = supportedFeatures.imageCubeArray            && (_init.capabilities & BGFX_CAPS_TEXTURE_CUBE_ARRAY);
-				m_deviceFeatures.independentBlend          = supportedFeatures.independentBlend          && (_init.capabilities & BGFX_CAPS_BLEND_INDEPENDENT);
-				m_deviceFeatures.multiDrawIndirect         = supportedFeatures.multiDrawIndirect         && (_init.capabilities & BGFX_CAPS_DRAW_INDIRECT);
-				m_deviceFeatures.drawIndirectFirstInstance = supportedFeatures.drawIndirectFirstInstance && (_init.capabilities & BGFX_CAPS_DRAW_INDIRECT);
-				m_deviceFeatures.depthClamp        = supportedFeatures.depthClamp;
-				m_deviceFeatures.fillModeNonSolid  = supportedFeatures.fillModeNonSolid;
-				m_deviceFeatures.largePoints       = supportedFeatures.largePoints;
-				m_deviceFeatures.samplerAnisotropy = supportedFeatures.samplerAnisotropy;
-				m_deviceFeatures.textureCompressionETC2 = supportedFeatures.textureCompressionETC2;
-				m_deviceFeatures.textureCompressionBC   = supportedFeatures.textureCompressionBC;
-				m_deviceFeatures.vertexPipelineStoresAndAtomics = supportedFeatures.vertexPipelineStoresAndAtomics;
-				m_deviceFeatures.fragmentStoresAndAtomics  = supportedFeatures.fragmentStoresAndAtomics;
-				m_deviceFeatures.shaderImageGatherExtended = supportedFeatures.shaderImageGatherExtended;
+				m_deviceFeatures.fullDrawIndexUint32               = supportedFeatures.fullDrawIndexUint32;
+				m_deviceFeatures.imageCubeArray                    = supportedFeatures.imageCubeArray            && (_init.capabilities & BGFX_CAPS_TEXTURE_CUBE_ARRAY);
+				m_deviceFeatures.independentBlend                  = supportedFeatures.independentBlend          && (_init.capabilities & BGFX_CAPS_BLEND_INDEPENDENT);
+				m_deviceFeatures.multiDrawIndirect                 = supportedFeatures.multiDrawIndirect         && (_init.capabilities & BGFX_CAPS_DRAW_INDIRECT);
+				m_deviceFeatures.drawIndirectFirstInstance         = supportedFeatures.drawIndirectFirstInstance && (_init.capabilities & BGFX_CAPS_DRAW_INDIRECT);
+				m_deviceFeatures.depthClamp                        = supportedFeatures.depthClamp;
+				m_deviceFeatures.fillModeNonSolid                  = supportedFeatures.fillModeNonSolid;
+				m_deviceFeatures.largePoints                       = supportedFeatures.largePoints;
+				m_deviceFeatures.samplerAnisotropy                 = supportedFeatures.samplerAnisotropy;
+				m_deviceFeatures.textureCompressionETC2            = supportedFeatures.textureCompressionETC2;
+				m_deviceFeatures.textureCompressionBC              = supportedFeatures.textureCompressionBC;
+				m_deviceFeatures.vertexPipelineStoresAndAtomics    = supportedFeatures.vertexPipelineStoresAndAtomics;
+				m_deviceFeatures.fragmentStoresAndAtomics          = supportedFeatures.fragmentStoresAndAtomics;
+				m_deviceFeatures.shaderImageGatherExtended         = supportedFeatures.shaderImageGatherExtended;
 				m_deviceFeatures.shaderStorageImageExtendedFormats = supportedFeatures.shaderStorageImageExtendedFormats;
-				m_deviceFeatures.shaderClipDistance   = supportedFeatures.shaderClipDistance;
-				m_deviceFeatures.shaderCullDistance   = supportedFeatures.shaderCullDistance;
-				m_deviceFeatures.shaderResourceMinLod = supportedFeatures.shaderResourceMinLod;
-				m_deviceFeatures.geometryShader = supportedFeatures.geometryShader;
+				m_deviceFeatures.shaderClipDistance                = supportedFeatures.shaderClipDistance;
+				m_deviceFeatures.shaderCullDistance                = supportedFeatures.shaderCullDistance;
+				m_deviceFeatures.shaderResourceMinLod              = supportedFeatures.shaderResourceMinLod;
+				m_deviceFeatures.geometryShader                    = supportedFeatures.geometryShader;
 
 				m_lineAASupport = true
 					&& s_extension[Extension::EXT_line_rasterization].m_supported
@@ -1781,7 +1770,6 @@ VK_IMPORT_INSTANCE
 
 			{
 				uint32_t numEnabledLayers = 0;
-
 				const char* enabledLayer[Layer::Count];
 
 				BX_TRACE("Enabled device layers:");
@@ -1797,30 +1785,29 @@ VK_IMPORT_INSTANCE
 						BX_TRACE("\t%s", layer.m_name);
 					}
 				}
-#if BX_PLATFORM_OSX
-				uint32_t numEnabledExtensions = headless ? 1 : 3;
 
-				const char* enabledExtension[Extension::Count + 3] =
-#else
-				uint32_t numEnabledExtensions = headless ? 1 : 2;
+				uint32_t numEnabledExtensions = 0;
+				const char* enabledExtension[Extension::Count + 3];
 
-				const char* enabledExtension[Extension::Count + 2] =
-#endif
+				enabledExtension[numEnabledExtensions++] = VK_KHR_MAINTENANCE1_EXTENSION_NAME;
+
+				if (!headless)
 				{
-					VK_KHR_MAINTENANCE1_EXTENSION_NAME,
-					VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-#if BX_PLATFORM_OSX
-					"VK_KHR_portability_subset",
-#endif
-				};
+					enabledExtension[numEnabledExtensions++] = VK_KHR_SWAPCHAIN_EXTENSION_NAME;
+				}
+
+				if (BX_ENABLED(BX_PLATFORM_OSX) )
+				{
+					enabledExtension[numEnabledExtensions++] = VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME;
+				}
 
 				for (uint32_t ii = 0; ii < Extension::Count; ++ii)
 				{
 					const Extension& extension = s_extension[ii];
 
-					bool layerEnabled = extension.m_layer == Layer::Count ||
-										(s_layer[extension.m_layer].m_device.m_supported &&
-										 s_layer[extension.m_layer].m_device.m_initialize);
+					bool layerEnabled = extension.m_layer == Layer::Count
+						|| (s_layer[extension.m_layer].m_device.m_supported	&& s_layer[extension.m_layer].m_device.m_initialize)
+						;
 
 					if (extension.m_supported
 					&&  extension.m_initialize
@@ -2060,7 +2047,7 @@ VK_IMPORT_DEVICE
 				{
 					m_gpuTimer.shutdown();
 				}
-				BX_FALLTHROUGH;
+				[[fallthrough]];
 
 			case ErrorState::DescriptorCreated:
 				for (uint32_t ii = 0; ii < m_numFramesInFlight; ++ii)
@@ -2069,19 +2056,19 @@ VK_IMPORT_DEVICE
 				}
 				vkDestroy(m_pipelineCache);
 				vkDestroy(m_descriptorPool);
-				BX_FALLTHROUGH;
+				[[fallthrough]];
 
 			case ErrorState::SwapChainCreated:
 				m_backBuffer.destroy();
-				BX_FALLTHROUGH;
+				[[fallthrough]];
 
 			case ErrorState::CommandQueueCreated:
 				m_cmd.shutdown();
-				BX_FALLTHROUGH;
+				[[fallthrough]];
 
 			case ErrorState::DeviceCreated:
 				vkDestroyDevice(m_device, m_allocatorCb);
-				BX_FALLTHROUGH;
+				[[fallthrough]];
 
 			case ErrorState::InstanceCreated:
 				if (VK_NULL_HANDLE != m_debugReportCallback)
@@ -2090,14 +2077,14 @@ VK_IMPORT_DEVICE
 				}
 
 				vkDestroyInstance(m_instance, m_allocatorCb);
-				BX_FALLTHROUGH;
+				[[fallthrough]];
 
 			case ErrorState::LoadedVulkan1:
 				bx::dlclose(m_vulkan1Dll);
 				m_vulkan1Dll  = NULL;
 				m_allocatorCb = NULL;
 				unloadRenderDoc(m_renderDocDll);
-				BX_FALLTHROUGH;
+				[[fallthrough]];
 
 			case ErrorState::Default:
 				break;
@@ -6621,15 +6608,15 @@ VK_DESTROY
 		{
 		case ErrorState::AttachmentsCreated:
 			releaseAttachments();
-			BX_FALLTHROUGH;
+			[[fallthrough]];
 
 		case ErrorState::SwapChainCreated:
 			releaseSwapChain();
-			BX_FALLTHROUGH;
+			[[fallthrough]];
 
 		case ErrorState::SurfaceCreated:
 			releaseSurface();
-			BX_FALLTHROUGH;
+			[[fallthrough]];
 
 		case ErrorState::Default:
 			break;
@@ -6780,72 +6767,88 @@ VK_DESTROY
 			}
 		}
 #elif BX_PLATFORM_LINUX
-#if     WL_EGL_PLATFORM
 		{
-			if (NULL != vkCreateWaylandSurfaceKHR)
+#if     defined(WL_EGL_PLATFORM)
+			if (g_platformData.type == bgfx::NativeWindowHandleType::Wayland)
 			{
 				VkWaylandSurfaceCreateInfoKHR sci;
 				sci.sType = VK_STRUCTURE_TYPE_WAYLAND_SURFACE_CREATE_INFO_KHR;
 				sci.pNext = NULL;
 				sci.flags = 0;
 				sci.display = (wl_display*)g_platformData.ndt;
-				sci.surface = (wl_surface*)((wl_egl_window*)g_platformData.nwh)->surface;
+				sci.surface = (wl_surface*)((wl_egl_window*)m_nwh)->surface;
 				result = vkCreateWaylandSurfaceKHR(instance, &sci, allocatorCb, &m_surface);
 			}
-		}
-#else
-		{
-			if (NULL != vkCreateXlibSurfaceKHR)
+			else
+#endif // defined(WL_EGL_PLATFORM)
 			{
-				VkXlibSurfaceCreateInfoKHR sci;
-				sci.sType = VK_STRUCTURE_TYPE_XLIB_SURFACE_CREATE_INFO_KHR;
-				sci.pNext = NULL;
-				sci.flags  = 0;
-				sci.dpy    = (Display*)g_platformData.ndt;
-				sci.window = (Window)m_nwh;
-				result = vkCreateXlibSurfaceKHR(instance, &sci, allocatorCb, &m_surface);
-			}
-
-			if (VK_SUCCESS != result)
-			{
-				void* xcbdll = bx::dlopen("libX11-xcb.so.1");
-
-				if (NULL != xcbdll
-				&&  NULL != vkCreateXcbSurfaceKHR)
+				if (NULL != vkCreateXlibSurfaceKHR)
 				{
-					typedef xcb_connection_t* (*PFN_XGETXCBCONNECTION)(Display*);
-					PFN_XGETXCBCONNECTION XGetXCBConnection = (PFN_XGETXCBCONNECTION)bx::dlsym(xcbdll, "XGetXCBConnection");
+					VkXlibSurfaceCreateInfoKHR sci;
+					sci.sType = VK_STRUCTURE_TYPE_XLIB_SURFACE_CREATE_INFO_KHR;
+					sci.pNext = NULL;
+					sci.flags  = 0;
+					sci.dpy    = (Display*)g_platformData.ndt;
+					sci.window = (Window)m_nwh;
+					result = vkCreateXlibSurfaceKHR(instance, &sci, allocatorCb, &m_surface);
+				}
 
-					union { void* ptr; xcb_window_t window; } cast = { m_nwh };
+				if (VK_SUCCESS != result)
+				{
+					void* xcbdll = bx::dlopen("libX11-xcb.so.1");
 
-					VkXcbSurfaceCreateInfoKHR sci;
-					sci.sType      = VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR;
-					sci.pNext      = NULL;
-					sci.flags      = 0;
-					sci.connection = XGetXCBConnection( (Display*)g_platformData.ndt);
-					sci.window     = cast.window;
-					result = vkCreateXcbSurfaceKHR(instance, &sci, allocatorCb, &m_surface);
+					if (NULL != xcbdll
+					&&  NULL != vkCreateXcbSurfaceKHR)
+					{
+						typedef xcb_connection_t* (*PFN_XGETXCBCONNECTION)(Display*);
+						PFN_XGETXCBCONNECTION XGetXCBConnection = (PFN_XGETXCBCONNECTION)bx::dlsym(xcbdll, "XGetXCBConnection");
 
-					bx::dlclose(xcbdll);
+						union { void* ptr; xcb_window_t window; } cast = { m_nwh };
+
+						VkXcbSurfaceCreateInfoKHR sci;
+						sci.sType      = VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR;
+						sci.pNext      = NULL;
+						sci.flags      = 0;
+						sci.connection = XGetXCBConnection( (Display*)g_platformData.ndt);
+						sci.window     = cast.window;
+						result = vkCreateXcbSurfaceKHR(instance, &sci, allocatorCb, &m_surface);
+
+						bx::dlclose(xcbdll);
+					}
 				}
 			}
 		}
-#endif // WL_EGL_PLATFORM
+
 #elif BX_PLATFORM_OSX
 		{
 			if (NULL != vkCreateMacOSSurfaceMVK)
 			{
 				NSWindow* window    = (NSWindow*)(m_nwh);
-				NSView* contentView = (NSView*)window.contentView;
-				CAMetalLayer* layer = [CAMetalLayer layer];
+				CAMetalLayer* layer = (CAMetalLayer*)(m_nwh);
+
+				if ([window isKindOfClass:[NSWindow class]])
+				{
+					NSView *contentView = (NSView *)window.contentView;
+					layer               = [CAMetalLayer layer];
+
+					[contentView setWantsLayer : YES];
+					[contentView setLayer : layer];
+				}
+				else if ([layer isKindOfClass:[CAMetalLayer class]])
+				{
+					NSView *contentView = (NSView *)layer.delegate;
+					window              = contentView.window;
+				}
+				else
+				{
+					BX_WARN(0, "Unable to create MoltenVk surface. Please set platform data window to an NSWindow or CAMetalLayer");
+					return result;
+				}
 
 				if (m_resolution.reset & BGFX_RESET_HIDPI)
 				{
 					layer.contentsScale = [window backingScaleFactor];
 				}
-
-				[contentView setWantsLayer : YES];
-				[contentView setLayer : layer];
 
 				VkMacOSSurfaceCreateInfoMVK sci;
 				sci.sType = VK_STRUCTURE_TYPE_MACOS_SURFACE_CREATE_INFO_MVK;
@@ -7419,7 +7422,7 @@ VK_DESTROY
 
 			case VK_ERROR_SURFACE_LOST_KHR:
 				m_needToRecreateSurface = true;
-				BX_FALLTHROUGH;
+				[[fallthrough]];
 
 			case VK_ERROR_OUT_OF_DATE_KHR:
 			case VK_SUBOPTIMAL_KHR:
@@ -7470,7 +7473,7 @@ VK_DESTROY
 			{
 			case VK_ERROR_SURFACE_LOST_KHR:
 				m_needToRecreateSurface = true;
-				BX_FALLTHROUGH;
+				[[fallthrough]];
 
 			case VK_ERROR_OUT_OF_DATE_KHR:
 			case VK_SUBOPTIMAL_KHR:

@@ -874,8 +874,6 @@ namespace bgfx { namespace d3d11
 			}
 #endif // USE_D3D11_DYNAMIC_LIB
 
-			m_device = (ID3D11Device*)g_platformData.context;
-
 			if (!m_dxgi.init(g_caps) )
 			{
 				goto error;
@@ -883,8 +881,10 @@ namespace bgfx { namespace d3d11
 
 			errorState = ErrorState::LoadedDXGI;
 
-			if (NULL != m_device)
+			if (NULL != g_platformData.context)
 			{
+				m_device = (ID3D11Device*)g_platformData.context;
+
 				m_device->AddRef();
 				m_device->GetImmediateContext(&m_deviceCtx);
 
@@ -1635,13 +1635,13 @@ namespace bgfx { namespace d3d11
 #endif // USE_D3D11_DYNAMIC_LIB
 
 				m_dxgi.shutdown();
-				BX_FALLTHROUGH;
+				[[fallthrough]];
 
 #if USE_D3D11_DYNAMIC_LIB
 			case ErrorState::LoadedD3D11:
 				bx::dlclose(m_d3d11Dll);
 				m_d3d11Dll = NULL;
-				BX_FALLTHROUGH;
+				[[fallthrough]];
 #endif // USE_D3D11_DYNAMIC_LIB
 
 			case ErrorState::Default:
@@ -2263,8 +2263,8 @@ namespace bgfx { namespace d3d11
 			if (NULL == m_backBufferDepthStencil)
 			{
 				D3D11_TEXTURE2D_DESC dsd;
-				dsd.Width  = m_scd.width;
-				dsd.Height = m_scd.height;
+				dsd.Width  = bx::uint32_max(m_scd.width,  1);
+				dsd.Height = bx::uint32_max(m_scd.height,  1);
 				dsd.MipLevels  = 1;
 				dsd.ArraySize  = 1;
 				dsd.Format     = DXGI_FORMAT_D24_UNORM_S8_UINT;

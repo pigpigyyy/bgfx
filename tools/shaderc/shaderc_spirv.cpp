@@ -5,6 +5,8 @@
 
 #include "shaderc.h"
 
+#include <iostream> // std::cout
+
 BX_PRAGMA_DIAGNOSTIC_PUSH()
 BX_PRAGMA_DIAGNOSTIC_IGNORED_MSVC(4100) // error C4100: 'inclusionDepth' : unreferenced formal parameter
 BX_PRAGMA_DIAGNOSTIC_IGNORED_MSVC(4265) // error C4265: 'spv::spirvbin_t': class has virtual functions, but destructor is not virtual
@@ -17,7 +19,7 @@ BX_PRAGMA_DIAGNOSTIC_IGNORED_CLANG_GCC("-Wshadow") // warning: declaration of 'u
 #include <ResourceLimits.h>
 #include <SPIRV/SPVRemapper.h>
 #include <SPIRV/GlslangToSpv.h>
-#include <webgpu/webgpu_cpp.h>
+#include <SPIRV/SpvTools.h>
 #define SPIRV_CROSS_EXCEPTIONS_TO_ASSERTIONS
 #include <spirv_msl.hpp>
 #include <spirv_reflect.hpp>
@@ -461,6 +463,7 @@ namespace bgfx { namespace spirv
 			| EShMsgReadHlsl
 			| EShMsgVulkanRules
 			| EShMsgSpvRules
+			| EShMsgDebugInfo
 			);
 
 		shader->setEntryPoint("main");
@@ -698,13 +701,14 @@ namespace bgfx { namespace spirv
 					program->dumpReflection();
 				}
 
-				BX_UNUSED(spv::MemorySemanticsAllMemory);
-
 				glslang::TIntermediate* intermediate = program->getIntermediate(stage);
 				std::vector<uint32_t> spirv;
 
 				glslang::SpvOptions options;
-				options.disableOptimizer = false;
+				options.disableOptimizer = _options.debugInformation;
+				options.generateDebugInfo = _options.debugInformation;
+				options.emitNonSemanticShaderDebugInfo = _options.debugInformation;
+				options.emitNonSemanticShaderDebugSource = _options.debugInformation;
 
 				glslang::GlslangToSpv(*intermediate, spirv, &options);
 

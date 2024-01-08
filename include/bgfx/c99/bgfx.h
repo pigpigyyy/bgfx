@@ -82,16 +82,14 @@ typedef enum bgfx_renderer_type
 {
     BGFX_RENDERER_TYPE_NOOP,                  /** ( 0) No rendering.                  */
     BGFX_RENDERER_TYPE_AGC,                   /** ( 1) AGC                            */
-    BGFX_RENDERER_TYPE_DIRECT3D9,             /** ( 2) Direct3D 9.0                   */
-    BGFX_RENDERER_TYPE_DIRECT3D11,            /** ( 3) Direct3D 11.0                  */
-    BGFX_RENDERER_TYPE_DIRECT3D12,            /** ( 4) Direct3D 12.0                  */
-    BGFX_RENDERER_TYPE_GNM,                   /** ( 5) GNM                            */
-    BGFX_RENDERER_TYPE_METAL,                 /** ( 6) Metal                          */
-    BGFX_RENDERER_TYPE_NVN,                   /** ( 7) NVN                            */
-    BGFX_RENDERER_TYPE_OPENGLES,              /** ( 8) OpenGL ES 2.0+                 */
-    BGFX_RENDERER_TYPE_OPENGL,                /** ( 9) OpenGL 2.1+                    */
-    BGFX_RENDERER_TYPE_VULKAN,                /** (10) Vulkan                         */
-    BGFX_RENDERER_TYPE_WEBGPU,                /** (11) WebGPU                         */
+    BGFX_RENDERER_TYPE_DIRECT3D11,            /** ( 2) Direct3D 11.0                  */
+    BGFX_RENDERER_TYPE_DIRECT3D12,            /** ( 3) Direct3D 12.0                  */
+    BGFX_RENDERER_TYPE_GNM,                   /** ( 4) GNM                            */
+    BGFX_RENDERER_TYPE_METAL,                 /** ( 5) Metal                          */
+    BGFX_RENDERER_TYPE_NVN,                   /** ( 6) NVN                            */
+    BGFX_RENDERER_TYPE_OPENGLES,              /** ( 7) OpenGL ES 2.0+                 */
+    BGFX_RENDERER_TYPE_OPENGL,                /** ( 8) OpenGL 2.1+                    */
+    BGFX_RENDERER_TYPE_VULKAN,                /** ( 9) Vulkan                         */
 
     BGFX_RENDERER_TYPE_COUNT
 
@@ -392,6 +390,19 @@ typedef enum bgfx_view_mode
 } bgfx_view_mode_t;
 
 /**
+ * Native window handle type.
+ *
+ */
+typedef enum bgfx_native_window_handle_type
+{
+    BGFX_NATIVE_WINDOW_HANDLE_TYPE_DEFAULT,   /** ( 0) Platform default handle type (X11 on Linux). */
+    BGFX_NATIVE_WINDOW_HANDLE_TYPE_WAYLAND,   /** ( 1) Wayland.                       */
+
+    BGFX_NATIVE_WINDOW_HANDLE_TYPE_COUNT
+
+} bgfx_native_window_handle_type_t;
+
+/**
  * Render frame enum.
  *
  */
@@ -624,6 +635,7 @@ typedef struct bgfx_platform_data_s
      * depth/stencil surface.
      */
     void*                backBufferDS;
+    bgfx_native_window_handle_type_t type;   /** Handle type. Needed for platforms having more than one option. */
 
 } bgfx_platform_data_t;
 
@@ -1645,6 +1657,8 @@ BGFX_C_API void bgfx_destroy_indirect_buffer(bgfx_indirect_buffer_handle_t _hand
 
 /**
  * Create shader from memory buffer.
+ * @remarks
+ *   Shader binary is obtained by compiling shader offline with shaderc command line tool.
  *
  * @param[in] _mem Shader binary.
  *

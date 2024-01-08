@@ -17,7 +17,6 @@ licensed under permissive BSD-2 clause open source license.
 Supported rendering backends
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
--  Direct3D 9
 -  Direct3D 11
 -  Direct3D 12
 -  GNM (only for licensed PS4 developers, search DevNet forums for source)
@@ -29,15 +28,14 @@ Supported rendering backends
 -  Vulkan
 -  WebGL 1.0
 -  WebGL 2.0
--  WebGPU/Dawn (experimental)
 
 Supported Platforms
 ~~~~~~~~~~~~~~~~~~~
 
--  Android (14+, ARM, x86, MIPS)
--  iOS/iPadOS/tvOS (iPhone, iPad, AppleTV)
+-  Android (14+)
+-  iOS/iPadOS/tvOS (16.0+)
 -  Linux
--  macOS (11+)
+-  macOS (13.0+)
 -  PlayStation 4
 -  RaspberryPi
 -  UWP (Universal Windows, Xbox One)

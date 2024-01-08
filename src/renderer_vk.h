@@ -11,14 +11,17 @@
 #	define KHR_SURFACE_EXTENSION_NAME VK_KHR_ANDROID_SURFACE_EXTENSION_NAME
 #	define VK_IMPORT_INSTANCE_PLATFORM VK_IMPORT_INSTANCE_ANDROID
 #elif BX_PLATFORM_LINUX
-#if WL_EGL_PLATFORM
-#	define VK_USE_PLATFORM_WAYLAND_KHR
-#	define KHR_SURFACE_EXTENSION_NAME VK_KHR_WAYLAND_SURFACE_EXTENSION_NAME
-#else
+#	if defined(WL_EGL_PLATFORM)
+#		define VK_USE_PLATFORM_WAYLAND_KHR
+#	endif // defined(WL_EGL_PLATFORM)
 #	define VK_USE_PLATFORM_XLIB_KHR
 #	define VK_USE_PLATFORM_XCB_KHR
-#	define KHR_SURFACE_EXTENSION_NAME VK_KHR_XCB_SURFACE_EXTENSION_NAME
-#endif // WL_EGL_PLATFORM
+#	if defined(WL_EGL_PLATFORM)
+#		define KHR_SURFACE_EXTENSION_NAME VK_KHR_WAYLAND_SURFACE_EXTENSION_NAME, \
+		VK_KHR_XCB_SURFACE_EXTENSION_NAME
+#	else
+#		define KHR_SURFACE_EXTENSION_NAME VK_KHR_XCB_SURFACE_EXTENSION_NAME
+#	endif // defined(WL_EGL_PLATFORM)
 #	define VK_IMPORT_INSTANCE_PLATFORM VK_IMPORT_INSTANCE_LINUX
 #elif BX_PLATFORM_WINDOWS
 #	define VK_USE_PLATFORM_WIN32_KHR
@@ -36,6 +39,7 @@
 #define VK_NO_STDINT_H
 #define VK_NO_PROTOTYPES
 #include <vulkan-local/vulkan.h>
+#include <vulkan-local/vulkan_beta.h>
 
 // vulkan.h pulls X11 crap...
 #if defined(None)
@@ -66,12 +70,17 @@
 			/* VK_KHR_android_surface */                               \
 			VK_IMPORT_INSTANCE_FUNC(true,  vkCreateAndroidSurfaceKHR); \
 
-#if WL_EGL_PLATFORM
+#if defined(WL_EGL_PLATFORM)
 #define VK_IMPORT_INSTANCE_LINUX                                                              \
 			/* VK_KHR_wayland_surface */                                                      \
 			VK_IMPORT_INSTANCE_FUNC(true,  vkCreateWaylandSurfaceKHR);                        \
 			VK_IMPORT_INSTANCE_FUNC(true,  vkGetPhysicalDeviceWaylandPresentationSupportKHR); \
-
+			/* VK_KHR_xlib_surface */                                                         \
+			VK_IMPORT_INSTANCE_FUNC(true,  vkCreateXlibSurfaceKHR);                           \
+			VK_IMPORT_INSTANCE_FUNC(true,  vkGetPhysicalDeviceXlibPresentationSupportKHR);    \
+			/* VK_KHR_xcb_surface */                                                          \
+			VK_IMPORT_INSTANCE_FUNC(true,  vkCreateXcbSurfaceKHR);                            \
+			VK_IMPORT_INSTANCE_FUNC(true,  vkGetPhysicalDeviceXcbPresentationSupportKHR);     \
 
 #else
 #define VK_IMPORT_INSTANCE_LINUX                                                           \
@@ -82,7 +91,7 @@
 			VK_IMPORT_INSTANCE_FUNC(true,  vkCreateXcbSurfaceKHR);                         \
 			VK_IMPORT_INSTANCE_FUNC(true,  vkGetPhysicalDeviceXcbPresentationSupportKHR);  \
 
-#endif // WL_EGL_PLATFORM
+#endif // defined(WL_EGL_PLATFORM)
 
 #define VK_IMPORT_INSTANCE_WINDOWS                                                          \
 			/* VK_KHR_win32_surface */                                                      \
