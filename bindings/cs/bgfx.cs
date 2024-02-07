@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2023 Branimir Karadzic. All rights reserved.
+ * Copyright 2011-2024 Branimir Karadzic. All rights reserved.
  * License: https://github.com/bkaradzic/bgfx/blob/master/LICENSE
  */
 
@@ -2516,6 +2516,12 @@ public static partial class bgfx
 	[DllImport(DllName, EntryPoint="bgfx_get_renderer_name", CallingConvention = CallingConvention.Cdecl)]
 	public static extern unsafe IntPtr get_renderer_name(RendererType _type);
 	
+	/// <summary>
+	/// Fill bgfx::Init struct with default values, before using it to initialize the library.
+	/// </summary>
+	///
+	/// <param name="_init">Pointer to structure to be initialized. See: `bgfx::Init` for more info.</param>
+	///
 	[DllImport(DllName, EntryPoint="bgfx_init_ctor", CallingConvention = CallingConvention.Cdecl)]
 	public static extern unsafe void init_ctor(Init* _init);
 	
@@ -3931,7 +3937,7 @@ public static partial class bgfx
 	/// <param name="_flags">Discard or preserve states. See `BGFX_DISCARD_*`.</param>
 	///
 	[DllImport(DllName, EntryPoint="bgfx_encoder_submit_indirect", CallingConvention = CallingConvention.Cdecl)]
-	public static extern unsafe void encoder_submit_indirect(Encoder* _this, ushort _id, ProgramHandle _program, IndirectBufferHandle _indirectHandle, ushort _start, ushort _num, uint _depth, byte _flags);
+	public static extern unsafe void encoder_submit_indirect(Encoder* _this, ushort _id, ProgramHandle _program, IndirectBufferHandle _indirectHandle, uint _start, uint _num, uint _depth, byte _flags);
 	
 	/// <summary>
 	/// Submit primitive for rendering with index and instance data info and
@@ -3950,7 +3956,7 @@ public static partial class bgfx
 	/// <param name="_flags">Discard or preserve states. See `BGFX_DISCARD_*`.</param>
 	///
 	[DllImport(DllName, EntryPoint="bgfx_encoder_submit_indirect_count", CallingConvention = CallingConvention.Cdecl)]
-	public static extern unsafe void encoder_submit_indirect_count(Encoder* _this, ushort _id, ProgramHandle _program, IndirectBufferHandle _indirectHandle, ushort _start, IndexBufferHandle _numHandle, uint _numIndex, ushort _numMax, uint _depth, byte _flags);
+	public static extern unsafe void encoder_submit_indirect_count(Encoder* _this, ushort _id, ProgramHandle _program, IndirectBufferHandle _indirectHandle, uint _start, IndexBufferHandle _numHandle, uint _numIndex, ushort _numMax, uint _depth, byte _flags);
 	
 	/// <summary>
 	/// Set compute index buffer.
@@ -4046,7 +4052,7 @@ public static partial class bgfx
 	/// <param name="_flags">Discard or preserve states. See `BGFX_DISCARD_*`.</param>
 	///
 	[DllImport(DllName, EntryPoint="bgfx_encoder_dispatch_indirect", CallingConvention = CallingConvention.Cdecl)]
-	public static extern unsafe void encoder_dispatch_indirect(Encoder* _this, ushort _id, ProgramHandle _program, IndirectBufferHandle _indirectHandle, ushort _start, ushort _num, byte _flags);
+	public static extern unsafe void encoder_dispatch_indirect(Encoder* _this, ushort _id, ProgramHandle _program, IndirectBufferHandle _indirectHandle, uint _start, uint _num, byte _flags);
 	
 	/// <summary>
 	/// Discard previously set state for draw or compute call.
@@ -4507,7 +4513,7 @@ public static partial class bgfx
 	/// <param name="_flags">Which states to discard for next draw. See `BGFX_DISCARD_*`.</param>
 	///
 	[DllImport(DllName, EntryPoint="bgfx_submit_indirect", CallingConvention = CallingConvention.Cdecl)]
-	public static extern unsafe void submit_indirect(ushort _id, ProgramHandle _program, IndirectBufferHandle _indirectHandle, ushort _start, ushort _num, uint _depth, byte _flags);
+	public static extern unsafe void submit_indirect(ushort _id, ProgramHandle _program, IndirectBufferHandle _indirectHandle, uint _start, uint _num, uint _depth, byte _flags);
 	
 	/// <summary>
 	/// Submit primitive for rendering with index and instance data info and
@@ -4526,7 +4532,7 @@ public static partial class bgfx
 	/// <param name="_flags">Which states to discard for next draw. See `BGFX_DISCARD_*`.</param>
 	///
 	[DllImport(DllName, EntryPoint="bgfx_submit_indirect_count", CallingConvention = CallingConvention.Cdecl)]
-	public static extern unsafe void submit_indirect_count(ushort _id, ProgramHandle _program, IndirectBufferHandle _indirectHandle, ushort _start, IndexBufferHandle _numHandle, uint _numIndex, ushort _numMax, uint _depth, byte _flags);
+	public static extern unsafe void submit_indirect_count(ushort _id, ProgramHandle _program, IndirectBufferHandle _indirectHandle, uint _start, IndexBufferHandle _numHandle, uint _numIndex, ushort _numMax, uint _depth, byte _flags);
 	
 	/// <summary>
 	/// Set compute index buffer.
