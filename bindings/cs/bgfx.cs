@@ -3452,9 +3452,10 @@ public static partial class bgfx
 	///
 	/// <param name="_id">View id.</param>
 	/// <param name="_name">View name.</param>
+	/// <param name="_len">View name length (if length is INT32_MAX, it's expected that _name is zero terminated string.</param>
 	///
 	[DllImport(DllName, EntryPoint="bgfx_set_view_name", CallingConvention = CallingConvention.Cdecl)]
-	public static extern unsafe void set_view_name(ushort _id, [MarshalAs(UnmanagedType.LPStr)] string _name);
+	public static extern unsafe void set_view_name(ushort _id, [MarshalAs(UnmanagedType.LPStr)] string _name, int _len);
 	
 	/// <summary>
 	/// Set view rectangle. Draw primitive outside view will be clipped.
@@ -3607,10 +3608,11 @@ public static partial class bgfx
 	/// graphics debugging tools.
 	/// </summary>
 	///
-	/// <param name="_marker">Marker string.</param>
+	/// <param name="_name">Marker name.</param>
+	/// <param name="_len">Marker name length (if length is INT32_MAX, it's expected that _name is zero terminated string.</param>
 	///
 	[DllImport(DllName, EntryPoint="bgfx_encoder_set_marker", CallingConvention = CallingConvention.Cdecl)]
-	public static extern unsafe void encoder_set_marker(Encoder* _this, [MarshalAs(UnmanagedType.LPStr)] string _marker);
+	public static extern unsafe void encoder_set_marker(Encoder* _this, [MarshalAs(UnmanagedType.LPStr)] string _name, int _len);
 	
 	/// <summary>
 	/// Set render states for draw primitive.
@@ -3956,7 +3958,7 @@ public static partial class bgfx
 	/// <param name="_flags">Discard or preserve states. See `BGFX_DISCARD_*`.</param>
 	///
 	[DllImport(DllName, EntryPoint="bgfx_encoder_submit_indirect_count", CallingConvention = CallingConvention.Cdecl)]
-	public static extern unsafe void encoder_submit_indirect_count(Encoder* _this, ushort _id, ProgramHandle _program, IndirectBufferHandle _indirectHandle, uint _start, IndexBufferHandle _numHandle, uint _numIndex, ushort _numMax, uint _depth, byte _flags);
+	public static extern unsafe void encoder_submit_indirect_count(Encoder* _this, ushort _id, ProgramHandle _program, IndirectBufferHandle _indirectHandle, uint _start, IndexBufferHandle _numHandle, uint _numIndex, uint _numMax, uint _depth, byte _flags);
 	
 	/// <summary>
 	/// Set compute index buffer.
@@ -4175,10 +4177,11 @@ public static partial class bgfx
 	/// graphics debugging tools.
 	/// </summary>
 	///
-	/// <param name="_marker">Marker string.</param>
+	/// <param name="_name">Marker name.</param>
+	/// <param name="_len">Marker name length (if length is INT32_MAX, it's expected that _name is zero terminated string.</param>
 	///
 	[DllImport(DllName, EntryPoint="bgfx_set_marker", CallingConvention = CallingConvention.Cdecl)]
-	public static extern unsafe void set_marker([MarshalAs(UnmanagedType.LPStr)] string _marker);
+	public static extern unsafe void set_marker([MarshalAs(UnmanagedType.LPStr)] string _name, int _len);
 	
 	/// <summary>
 	/// Set render states for draw primitive.
@@ -4532,7 +4535,7 @@ public static partial class bgfx
 	/// <param name="_flags">Which states to discard for next draw. See `BGFX_DISCARD_*`.</param>
 	///
 	[DllImport(DllName, EntryPoint="bgfx_submit_indirect_count", CallingConvention = CallingConvention.Cdecl)]
-	public static extern unsafe void submit_indirect_count(ushort _id, ProgramHandle _program, IndirectBufferHandle _indirectHandle, uint _start, IndexBufferHandle _numHandle, uint _numIndex, ushort _numMax, uint _depth, byte _flags);
+	public static extern unsafe void submit_indirect_count(ushort _id, ProgramHandle _program, IndirectBufferHandle _indirectHandle, uint _start, IndexBufferHandle _numHandle, uint _numIndex, uint _numMax, uint _depth, byte _flags);
 	
 	/// <summary>
 	/// Set compute index buffer.
@@ -4628,7 +4631,7 @@ public static partial class bgfx
 	/// <param name="_flags">Discard or preserve states. See `BGFX_DISCARD_*`.</param>
 	///
 	[DllImport(DllName, EntryPoint="bgfx_dispatch_indirect", CallingConvention = CallingConvention.Cdecl)]
-	public static extern unsafe void dispatch_indirect(ushort _id, ProgramHandle _program, IndirectBufferHandle _indirectHandle, ushort _start, ushort _num, byte _flags);
+	public static extern unsafe void dispatch_indirect(ushort _id, ProgramHandle _program, IndirectBufferHandle _indirectHandle, uint _start, uint _num, byte _flags);
 	
 	/// <summary>
 	/// Discard previously set state for draw or compute call.

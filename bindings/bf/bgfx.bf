@@ -3496,9 +3496,10 @@ public static class bgfx
 	///
 	/// <param name="_id">View id.</param>
 	/// <param name="_name">View name.</param>
+	/// <param name="_len">View name length (if length is INT32_MAX, it's expected that _name is zero terminated string.</param>
 	///
 	[LinkName("bgfx_set_view_name")]
-	public static extern void set_view_name(ViewId _id, char8* _name);
+	public static extern void set_view_name(ViewId _id, char8* _name, int _len);
 	
 	/// <summary>
 	/// Set view rectangle. Draw primitive outside view will be clipped.
@@ -3651,10 +3652,11 @@ public static class bgfx
 	/// graphics debugging tools.
 	/// </summary>
 	///
-	/// <param name="_marker">Marker string.</param>
+	/// <param name="_name">Marker name.</param>
+	/// <param name="_len">Marker name length (if length is INT32_MAX, it's expected that _name is zero terminated string.</param>
 	///
 	[LinkName("bgfx_encoder_set_marker")]
-	public static extern void encoder_set_marker(Encoder* _this, char8* _marker);
+	public static extern void encoder_set_marker(Encoder* _this, char8* _name, int _len);
 	
 	/// <summary>
 	/// Set render states for draw primitive.
@@ -4000,7 +4002,7 @@ public static class bgfx
 	/// <param name="_flags">Discard or preserve states. See `BGFX_DISCARD_*`.</param>
 	///
 	[LinkName("bgfx_encoder_submit_indirect_count")]
-	public static extern void encoder_submit_indirect_count(Encoder* _this, ViewId _id, ProgramHandle _program, IndirectBufferHandle _indirectHandle, uint32 _start, IndexBufferHandle _numHandle, uint32 _numIndex, uint16 _numMax, uint32 _depth, uint8 _flags);
+	public static extern void encoder_submit_indirect_count(Encoder* _this, ViewId _id, ProgramHandle _program, IndirectBufferHandle _indirectHandle, uint32 _start, IndexBufferHandle _numHandle, uint32 _numIndex, uint32 _numMax, uint32 _depth, uint8 _flags);
 	
 	/// <summary>
 	/// Set compute index buffer.
@@ -4219,10 +4221,11 @@ public static class bgfx
 	/// graphics debugging tools.
 	/// </summary>
 	///
-	/// <param name="_marker">Marker string.</param>
+	/// <param name="_name">Marker name.</param>
+	/// <param name="_len">Marker name length (if length is INT32_MAX, it's expected that _name is zero terminated string.</param>
 	///
 	[LinkName("bgfx_set_marker")]
-	public static extern void set_marker(char8* _marker);
+	public static extern void set_marker(char8* _name, int _len);
 	
 	/// <summary>
 	/// Set render states for draw primitive.
@@ -4576,7 +4579,7 @@ public static class bgfx
 	/// <param name="_flags">Which states to discard for next draw. See `BGFX_DISCARD_*`.</param>
 	///
 	[LinkName("bgfx_submit_indirect_count")]
-	public static extern void submit_indirect_count(ViewId _id, ProgramHandle _program, IndirectBufferHandle _indirectHandle, uint32 _start, IndexBufferHandle _numHandle, uint32 _numIndex, uint16 _numMax, uint32 _depth, uint8 _flags);
+	public static extern void submit_indirect_count(ViewId _id, ProgramHandle _program, IndirectBufferHandle _indirectHandle, uint32 _start, IndexBufferHandle _numHandle, uint32 _numIndex, uint32 _numMax, uint32 _depth, uint8 _flags);
 	
 	/// <summary>
 	/// Set compute index buffer.
@@ -4672,7 +4675,7 @@ public static class bgfx
 	/// <param name="_flags">Discard or preserve states. See `BGFX_DISCARD_*`.</param>
 	///
 	[LinkName("bgfx_dispatch_indirect")]
-	public static extern void dispatch_indirect(ViewId _id, ProgramHandle _program, IndirectBufferHandle _indirectHandle, uint16 _start, uint16 _num, uint8 _flags);
+	public static extern void dispatch_indirect(ViewId _id, ProgramHandle _program, IndirectBufferHandle _indirectHandle, uint32 _start, uint32 _num, uint8 _flags);
 	
 	/// <summary>
 	/// Discard previously set state for draw or compute call.

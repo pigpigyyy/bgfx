@@ -600,6 +600,21 @@ based on Lua, with excellent performance and easy customization.
 
 ![RedFrontier](https://github.com/ejoy/vaststars/blob/master/screenshot/startup.jpg)
 
+## Crypt of the NecroDancer
+
+https://braceyourselfgames.com/crypt-of-the-necrodancer/ - Crypt of the NecroDancer
+is an award-winning hardcore roguelike rhythm game. Move to the music and deliver
+beatdowns to the beat! The game uses bgfx on Windows, macOS, Linux, Nintendo
+Switch and PlayStation 4.
+
+![Crypt of the NecroDancer screenshot](https://raw.githubusercontent.com/Marukyu/marukyu.github.io/misc-assets/247080_20240322072858_1.png)
+
+## Tomb4Plus
+
+https://www.github.com/SaracenOne/Tomb4Plus - Tomb4Plus is an open source reimplementation of the Tomb Raider: The Last Revelation engine. It is an enhanced fork of the original [Tomb4](https://github.com/Trxyebeep/TOMB4) reimplementation project which focuses on supporting the Level Editor runtime and aims for full compatibility with the unofficial binary-patched scripting extensions used by many custom levels. Tomb4Plus also replaces the original legacy Direct3D renderer with bgfx.
+
+![Tomb4Plus screenshot](https://raw.githubusercontent.com/SaracenOne/Tomb4Plus/level_editor_v2/.github/images/preview.png)
+
 [License (BSD 2-clause)](https://bkaradzic.github.io/bgfx/license.html)
 -----------------------------------------------------------------------
 
